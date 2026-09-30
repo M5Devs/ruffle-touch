@@ -39,6 +39,7 @@ class RuffleTouch {
         };
 
         this.init();
+        this.attachBackgroundTouchTrap();
     }
 
     /**
@@ -61,6 +62,40 @@ class RuffleTouch {
     }
 
     /**
+     * Focus Ruffle player instance if set and available
+     */
+    focusPlayer() {
+        if (this.player && typeof this.player.focus === 'function') {
+            try {
+                this.player.focus();
+            } catch (err) {
+                // Ignore focus errors if player is unmounted
+            }
+        }
+    }
+
+    /**
+     * Attach background/edge touch & click listeners for focus lock
+     */
+    attachBackgroundTouchTrap() {
+        const handleTrap = (e) => {
+            // Check if touch/click was directly on a button or header input
+            if (e.target && e.target.closest && e.target.closest('button, input, label')) {
+                return;
+            }
+            this.focusPlayer();
+        };
+
+        const targetElements = [document.body, this.container];
+        targetElements.forEach((el) => {
+            if (el) {
+                el.addEventListener('pointerdown', handleTrap, { passive: true });
+                el.addEventListener('click', handleTrap, { passive: true });
+            }
+        });
+    }
+
+    /**
      * Build the UI overlay DOM structure
      */
     init() {
@@ -78,6 +113,7 @@ class RuffleTouch {
         this.toggleBtn.addEventListener('click', (e) => {
             e.preventDefault();
             this.toggleVisibility();
+            this.focusPlayer();
         });
 
         // Overlay Main Wrapper
@@ -150,6 +186,7 @@ class RuffleTouch {
             e.preventDefault();
             e.stopPropagation();
             btn.classList.add('active');
+            this.focusPlayer();
             this.triggerKeyDown(keyId);
         };
 
@@ -157,6 +194,7 @@ class RuffleTouch {
             e.preventDefault();
             e.stopPropagation();
             btn.classList.remove('active');
+            this.focusPlayer();
             this.triggerKeyUp(keyId);
         };
 
