@@ -2,24 +2,36 @@
 
 /* Mobile polish & base styles for overlay elements */
 .ruffle-touch-overlay,
-.ruffle-touch-toggle,
-.ruffle-touch-btn {
+.ruffle-touch-toolbar-btn,
+.ruffle-touch-btn,
+.ruffle-touch-drawer {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   -khtml-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  touch-action: none;
   box-sizing: border-box;
 }
 
-/* Floating Toggle Button (Top Right Corner) */
-.ruffle-touch-toggle {
+.ruffle-touch-overlay,
+.ruffle-touch-toolbar-btn,
+.ruffle-touch-btn {
+  touch-action: none;
+}
+
+/* Floating Toolbar (Top Right Corner) */
+.ruffle-touch-toolbar {
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ruffle-touch-toolbar-btn {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -28,16 +40,17 @@
   -webkit-backdrop-filter: blur(8px);
   border: 1.5px solid rgba(255, 255, 255, 0.35);
   color: #ffffff;
-  font-size: 24px;
+  font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
   transition: transform 0.15s ease, background 0.15s ease;
+  outline: none;
 }
 
-.ruffle-touch-toggle:active {
+.ruffle-touch-toolbar-btn:active {
   transform: scale(0.92);
   background: rgba(255, 255, 255, 0.25);
 }
@@ -59,7 +72,7 @@
 }
 
 .ruffle-touch-overlay.ruffle-touch-hidden {
-  opacity: 0;
+  opacity: 0 !important;
   visibility: hidden;
   pointer-events: none !important;
 }
@@ -100,6 +113,7 @@
   width: 160px;
   height: 160px;
   pointer-events: auto;
+  transition: transform 0.15s ease;
 }
 
 .ruffle-touch-dpad .ruffle-touch-btn {
@@ -156,6 +170,7 @@
   align-items: flex-end;
   gap: 16px;
   pointer-events: auto;
+  transition: transform 0.15s ease;
 }
 
 .action-group {
@@ -185,6 +200,262 @@
   border-radius: 20px;
   font-size: 13px;
   letter-spacing: 0.5px;
+}
+
+/* Settings Drawer Backdrop */
+.ruffle-touch-drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10001;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.ruffle-touch-drawer-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Sliding Settings Drawer */
+.ruffle-touch-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  max-width: 85vw;
+  height: 100vh;
+  background: rgba(18, 22, 28, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.7);
+  z-index: 10002;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  color: #f0f4f8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-y: auto;
+}
+
+.ruffle-touch-drawer.open {
+  transform: translateX(0);
+}
+
+/* Drawer Header */
+.ruffle-touch-drawer-header {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ruffle-touch-drawer-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ruffle-touch-drawer-close {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.ruffle-touch-drawer-close:hover,
+.ruffle-touch-drawer-close:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Drawer Content */
+.ruffle-touch-drawer-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ruffle-touch-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ruffle-touch-settings-section h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8b949e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+}
+
+.ruffle-touch-setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-toggle-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setting-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.setting-value {
+  color: #58a6ff;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* Range Slider */
+.ruffle-touch-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+}
+
+.ruffle-touch-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #58a6ff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.5);
+  border: 2px solid #ffffff;
+}
+
+.ruffle-touch-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #58a6ff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.5);
+  border: 2px solid #ffffff;
+}
+
+/* Toggle Switch */
+.ruffle-touch-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.ruffle-touch-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: .2s;
+  border-radius: 24px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+
+.ruffle-touch-switch input:checked + .switch-slider {
+  background-color: #238636;
+}
+
+.ruffle-touch-switch input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+
+/* Action Buttons in Settings Drawer */
+.ruffle-touch-btn-action {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ruffle-touch-btn-action:hover,
+.ruffle-touch-btn-action:active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.ruffle-touch-save-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ruffle-touch-btn-action.btn-danger {
+  background: rgba(218, 54, 51, 0.2);
+  border-color: rgba(218, 54, 51, 0.5);
+  color: #f85149;
+}
+
+.ruffle-touch-btn-action.btn-danger:hover,
+.ruffle-touch-btn-action.btn-danger:active {
+  background: rgba(218, 54, 51, 0.4);
+  border-color: rgba(218, 54, 51, 0.8);
 }
 
 /* Responsive Scaling for smaller screens */
@@ -219,5 +490,10 @@
     height: 36px;
     padding: 0 12px;
     font-size: 11px;
+  }
+
+  .ruffle-touch-drawer {
+    width: 100vw;
+    max-width: 100vw;
   }
 }
