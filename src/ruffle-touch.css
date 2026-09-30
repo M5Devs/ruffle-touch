@@ -1,0 +1,235 @@
+/* RuffleTouch Styles */
+
+/* Mobile polish & base styles for overlay elements */
+.ruffle-touch-overlay,
+.ruffle-touch-toggle,
+.ruffle-touch-btn {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  touch-action: none;
+  box-sizing: border-box;
+}
+
+/* Floating Toggle Button (Top Right Corner) */
+.ruffle-touch-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(20, 20, 25, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.ruffle-touch-toggle:active {
+  transform: scale(0.92);
+  background: rgba(35, 35, 45, 0.9);
+}
+
+/* Gamepad Overlay Container */
+.ruffle-touch-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 24px;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.ruffle-touch-overlay.ruffle-touch-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none !important;
+}
+
+.ruffle-touch-overlay.ruffle-touch-hidden * {
+  pointer-events: none !important;
+}
+
+/* Controls Base Button */
+.ruffle-touch-btn {
+  pointer-events: auto;
+  border: none;
+  outline: none;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: bold;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s ease, transform 0.1s ease;
+}
+
+.ruffle-touch-btn:active,
+.ruffle-touch-btn.active {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0.94);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* D-PAD Container (Bottom-Left) */
+.ruffle-touch-dpad {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  pointer-events: auto;
+}
+
+.ruffle-touch-dpad .ruffle-touch-btn {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+  border-radius: 8px;
+}
+
+.dpad-up {
+  top: 0;
+  left: 54px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.dpad-down {
+  bottom: 0;
+  left: 54px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.dpad-left {
+  top: 54px;
+  left: 0;
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.dpad-right {
+  top: 54px;
+  right: 0;
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.dpad-center {
+  position: absolute;
+  top: 54px;
+  left: 54px;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+/* Action Buttons Container (Bottom-Right) */
+.ruffle-touch-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  pointer-events: auto;
+}
+
+.action-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Action Buttons (Z, X) */
+.action-z, .action-x {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  font-size: 22px;
+}
+
+.action-z {
+  background: rgba(239, 68, 68, 0.35); /* Soft Red */
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.action-z:active, .action-z.active {
+  background: rgba(239, 68, 68, 0.7);
+}
+
+.action-x {
+  background: rgba(59, 130, 246, 0.35); /* Soft Blue */
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+.action-x:active, .action-x.active {
+  background: rgba(59, 130, 246, 0.7);
+}
+
+/* Secondary Action Buttons (Space, Enter) */
+.action-space, .action-enter {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive Scaling for smaller screens */
+@media (max-width: 600px) {
+  .ruffle-touch-overlay {
+    padding: 12px;
+  }
+
+  .ruffle-touch-dpad {
+    width: 140px;
+    height: 140px;
+  }
+
+  .ruffle-touch-dpad .ruffle-touch-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .dpad-up, .dpad-down { left: 47px; }
+  .dpad-left { top: 47px; }
+  .dpad-right { top: 47px; }
+  .dpad-center { top: 47px; left: 47px; width: 46px; height: 46px; }
+
+  .action-z, .action-x {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+  }
+
+  .action-space, .action-enter {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+}
