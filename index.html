@@ -51,40 +51,6 @@
       gap: 8px;
     }
 
-    .controls-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .file-input-wrapper {
-      position: relative;
-      display: inline-block;
-    }
-
-    .file-input-wrapper input[type="file"] {
-      display: none;
-    }
-
-    .btn-upload {
-      background-color: #238636;
-      color: #ffffff;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: none;
-      transition: background-color 0.15s ease;
-    }
-
-    .btn-upload:hover {
-      background-color: #2ea043;
-    }
-
     #player-container {
       flex: 1;
       width: 100%;
@@ -97,15 +63,77 @@
       overflow: hidden;
     }
 
-    .placeholder-notice {
+    /* Launcher Card Styles */
+    .launcher-card {
+      background: rgba(22, 27, 34, 0.85);
+      border: 2px dashed #30363d;
+      border-radius: 16px;
+      padding: 40px 32px;
       text-align: center;
-      color: #8b949e;
-      padding: 20px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.2s ease, background-color 0.2s ease;
+      z-index: 5;
     }
 
-    .placeholder-notice p {
-      margin-top: 8px;
-      font-size: 0.9rem;
+    .launcher-card.dragover {
+      border-color: #58a6ff;
+      background-color: rgba(30, 40, 55, 0.95);
+      transform: scale(1.02);
+    }
+
+    .launcher-card.hidden {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    .launcher-icon {
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+
+    .launcher-card h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #f0f4f8;
+    }
+
+    .launcher-card p {
+      font-size: 0.95rem;
+      color: #8b949e;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .btn-launcher {
+      background-color: #238636;
+      color: #ffffff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      box-shadow: 0 4px 12px rgba(35, 134, 54, 0.4);
+      transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn-launcher:hover {
+      background-color: #2ea043;
+    }
+
+    .btn-launcher:active {
+      transform: scale(0.96);
     }
 
     ruffle-player {
@@ -124,23 +152,22 @@
       <div class="title">
         <span>🎮 Ruffle Touch Gamepad</span>
       </div>
-      <div class="controls-bar">
-        <div class="file-input-wrapper">
-          <label for="swf-file" class="btn-upload">
-            📁 Open SWF File
-          </label>
-          <input type="file" id="swf-file" accept=".swf">
-        </div>
-      </div>
     </header>
 
     <div id="player-container">
-      <div id="placeholder" class="placeholder-notice">
-        <h3>No Flash (.swf) File Loaded</h3>
-        <p>Select a local .swf file using the button above to start playing with touch controls.</p>
+      <div id="launcher-card" class="launcher-card">
+        <div class="launcher-icon">🎮</div>
+        <h2>Flash Game Launcher</h2>
+        <p>Drag and drop a Flash (.swf) game file here, or click below to select one from your device.</p>
+        <button type="button" id="btn-select-swf" class="btn-launcher">
+          📁 Choose SWF File
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- Shared Hidden File Input for Game Loading -->
+  <input type="file" id="global-swf-input" accept=".swf" style="display: none;">
 
   <!-- Load RuffleTouch script -->
   <script src="src/ruffle-touch.js"></script>
@@ -148,18 +175,60 @@
     window.addEventListener('DOMContentLoaded', () => {
       let rufflePlayerInstance = null;
 
-      // Instantiate RuffleTouch controller overlay attached to #app container
+      const playerContainer = document.getElementById('player-container');
+      const launcherCard = document.getElementById('launcher-card');
+      const globalFileInput = document.getElementById('global-swf-input');
+      const btnSelectSwf = document.getElementById('btn-select-swf');
+
+      // Instantiate RuffleTouch controller overlay attached to #app container (hidden by default)
       const ruffleTouch = new RuffleTouch({
         container: document.getElementById('app'),
-        visible: true
+        visible: false,
+        onFileSelect: (file) => {
+          loadSwfFile(file);
+        }
       });
 
-      const fileInput = document.getElementById('swf-file');
-      const playerContainer = document.getElementById('player-container');
-      const placeholder = document.getElementById('placeholder');
+      function triggerFilePicker() {
+        globalFileInput.click();
+      }
 
-      fileInput.addEventListener('change', (e) => {
+      btnSelectSwf.addEventListener('click', triggerFilePicker);
+
+      globalFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
+        if (file) {
+          loadSwfFile(file);
+          globalFileInput.value = '';
+        }
+      });
+
+      // Drag and drop support on launcher card & container
+      ['dragenter', 'dragover'].forEach(eventName => {
+        playerContainer.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          launcherCard.classList.add('dragover');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        playerContainer.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          launcherCard.classList.remove('dragover');
+        }, false);
+      });
+
+      playerContainer.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+          loadSwfFile(files[0]);
+        }
+      });
+
+      function loadSwfFile(file) {
         if (!file) return;
 
         // Obtain Ruffle player instance using Ruffle API window.RufflePlayer
@@ -170,11 +239,12 @@
         }
 
         // Clean up previous instance if exists
-        if (rufflePlayerInstance) {
-          playerContainer.removeChild(rufflePlayerInstance);
-        } else if (placeholder) {
-          placeholder.style.display = 'none';
+        if (rufflePlayerInstance && rufflePlayerInstance.parentNode) {
+          rufflePlayerInstance.parentNode.removeChild(rufflePlayerInstance);
         }
+
+        // Hide launcher card with smooth fade
+        launcherCard.classList.add('hidden');
 
         // Create player element using Ruffle JavaScript API
         rufflePlayerInstance = ruffle.createPlayer();
@@ -183,6 +253,7 @@
         // Connect touch gamepad to the player element
         ruffleTouch.setPlayer(rufflePlayerInstance);
         ruffleTouch.setTarget(rufflePlayerInstance);
+        ruffleTouch.show();
 
         // Load local SWF file array buffer
         const reader = new FileReader();
@@ -193,7 +264,7 @@
           });
         };
         reader.readAsArrayBuffer(file);
-      });
+      }
     });
   </script>
 </body>

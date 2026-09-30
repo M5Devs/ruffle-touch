@@ -9,12 +9,14 @@ class RuffleTouch {
      * @param {HTMLElement|Window} [options.target] Target element to receive keyboard events (defaults to window)
      * @param {HTMLElement} [options.player] Ruffle player instance reference
      * @param {boolean} [options.visible=true] Initial visibility state of controls
+     * @param {Function} [options.onFileSelect] Callback when user selects a file from toolbar/drawer
      */
     constructor(options = {}) {
         if (typeof options === 'string') {
             options = { container: options };
         }
 
+        this.options = options;
         this.container = typeof options.container === 'string'
             ? document.querySelector(options.container)
             : (options.container || document.body);
@@ -22,14 +24,19 @@ class RuffleTouch {
         this.player = options.player || null;
         this.target = options.target || this.player || window;
         this.visible = options.visible !== undefined ? Boolean(options.visible) : true;
+        this.onFileSelect = options.onFileSelect || null;
 
         this.overlayElement = null;
         this.toolbarElement = null;
         this.toggleBtn = null;
         this.settingsBtn = null;
+        this.openSwfBtn = null;
         this.drawerElement = null;
         this.drawerBackdrop = null;
-        this.activeKeys = new Map();
+
+        // Active key tracking to eliminate duplicate events
+        this.activeKeys = new Set();
+        this.activeDpadKeys = new Set();
 
         this.settings = this.loadSettings();
 
@@ -109,7 +116,7 @@ class RuffleTouch {
     triggerHaptic() {
         if (this.settings.haptic && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
             try {
-                navigator.vibrate(25);
+                navigator.vibrate(20);
             } catch (err) {
                 // Ignore vibration errors
             }
@@ -121,7 +128,7 @@ class RuffleTouch {
      * @param {HTMLElement|Window} target
      */
     setTarget(target) {
-        this.target = target || window;
+        this.target = window; // Synthetic events are dispatched directly to window to prevent duplicate firing
     }
 
     /**
@@ -130,9 +137,7 @@ class RuffleTouch {
      */
     setPlayer(player) {
         this.player = player;
-        if (player && !this.target) {
-            this.target = player;
-        }
+        this.target = window;
     }
 
     /**
@@ -143,7 +148,7 @@ class RuffleTouch {
             try {
                 this.player.focus();
             } catch (err) {
-                // Ignore focus errors if player is unmounted
+                // Ignore focus errors
             }
         }
     }
@@ -153,7 +158,6 @@ class RuffleTouch {
      */
     attachBackgroundTouchTrap() {
         const handleTrap = (e) => {
-            // Check if touch/click was directly on a button, input, label, or inside settings drawer
             if (e.target && e.target.closest && e.target.closest('button, input, label, .ruffle-touch-drawer, .ruffle-touch-toolbar')) {
                 return;
             }
@@ -170,6 +174,30 @@ class RuffleTouch {
     }
 
     /**
+     * Helper to prompt file selection
+     */
+    promptFileSelection() {
+        const fileInput = document.getElementById('global-swf-input') || document.createElement('input');
+        if (!fileInput.parentNode && fileInput.type !== 'file') {
+            fileInput.type = 'file';
+            fileInput.accept = '.swf';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+        }
+
+        const handleChange = (e) => {
+            const file = e.target.files[0];
+            if (file && typeof this.onFileSelect === 'function') {
+                this.onFileSelect(file);
+            }
+            fileInput.removeEventListener('change', handleChange);
+        };
+
+        fileInput.addEventListener('change', handleChange);
+        fileInput.click();
+    }
+
+    /**
      * Build the UI overlay DOM structure
      */
     init() {
@@ -181,6 +209,18 @@ class RuffleTouch {
         // Toolbar Container (Top Right Corner)
         this.toolbarElement = document.createElement('div');
         this.toolbarElement.className = 'ruffle-touch-toolbar';
+
+        // Open SWF Folder Button (📁)
+        this.openSwfBtn = document.createElement('button');
+        this.openSwfBtn.className = 'ruffle-touch-toolbar-btn ruffle-touch-open-swf';
+        this.openSwfBtn.setAttribute('aria-label', 'Open / Change SWF File');
+        this.openSwfBtn.type = 'button';
+        this.openSwfBtn.innerHTML = '📁';
+        this.openSwfBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.promptFileSelection();
+        });
 
         // Settings Button (⚙️)
         this.settingsBtn = document.createElement('button');
@@ -207,6 +247,7 @@ class RuffleTouch {
             this.focusPlayer();
         });
 
+        this.toolbarElement.appendChild(this.openSwfBtn);
         this.toolbarElement.appendChild(this.settingsBtn);
         this.toolbarElement.appendChild(this.toggleBtn);
 
@@ -217,31 +258,17 @@ class RuffleTouch {
             this.overlayElement.classList.add('ruffle-touch-hidden');
         }
 
-        // D-Pad (Bottom-Left)
-        const dpadContainer = document.createElement('div');
-        dpadContainer.className = 'ruffle-touch-dpad';
-
-        const dpadUp = this.createButton('up', 'ruffle-touch-btn dpad-up');
-        const dpadDown = this.createButton('down', 'ruffle-touch-btn dpad-down');
-        const dpadLeft = this.createButton('left', 'ruffle-touch-btn dpad-left');
-        const dpadRight = this.createButton('right', 'ruffle-touch-btn dpad-right');
-        const dpadCenter = document.createElement('div');
-        dpadCenter.className = 'dpad-center';
-
-        dpadContainer.appendChild(dpadUp);
-        dpadContainer.appendChild(dpadDown);
-        dpadContainer.appendChild(dpadLeft);
-        dpadContainer.appendChild(dpadRight);
-        dpadContainer.appendChild(dpadCenter);
+        // D-Pad Construction (8-Way Directional Pad)
+        const dpadContainer = this.createDpad();
 
         // Action Buttons (Bottom-Right)
         const actionContainer = document.createElement('div');
         actionContainer.className = 'ruffle-touch-actions';
 
-        const btnZ = this.createButton('z', 'ruffle-touch-btn action-z');
-        const btnX = this.createButton('x', 'ruffle-touch-btn action-x');
-        const btnSpace = this.createButton('space', 'ruffle-touch-btn action-space');
-        const btnEnter = this.createButton('enter', 'ruffle-touch-btn action-enter');
+        const btnZ = this.createActionButton('z', 'ruffle-touch-btn action-z');
+        const btnX = this.createActionButton('x', 'ruffle-touch-btn action-x');
+        const btnSpace = this.createActionButton('space', 'ruffle-touch-btn action-space');
+        const btnEnter = this.createActionButton('enter', 'ruffle-touch-btn action-enter');
 
         const topActions = document.createElement('div');
         topActions.className = 'action-group primary-actions';
@@ -274,9 +301,202 @@ class RuffleTouch {
     }
 
     /**
-     * Create individual touch button with listeners
+     * Create 8-Way Interactive D-Pad with diagonal touch sliding support
      */
-    createButton(keyId, className) {
+    createDpad() {
+        const dpadContainer = document.createElement('div');
+        dpadContainer.className = 'ruffle-touch-dpad';
+
+        // Cardinal Buttons
+        const btnUp = document.createElement('div');
+        btnUp.className = 'ruffle-touch-btn dpad-btn dpad-up';
+        btnUp.dataset.key = 'up';
+        btnUp.textContent = '▲';
+
+        const btnDown = document.createElement('div');
+        btnDown.className = 'ruffle-touch-btn dpad-btn dpad-down';
+        btnDown.dataset.key = 'down';
+        btnDown.textContent = '▼';
+
+        const btnLeft = document.createElement('div');
+        btnLeft.className = 'ruffle-touch-btn dpad-btn dpad-left';
+        btnLeft.dataset.key = 'left';
+        btnLeft.textContent = '◀';
+
+        const btnRight = document.createElement('div');
+        btnRight.className = 'ruffle-touch-btn dpad-btn dpad-right';
+        btnRight.dataset.key = 'right';
+        btnRight.textContent = '▶';
+
+        // Diagonal Visual Indicators / Hit zones
+        const diagUpLeft = document.createElement('div');
+        diagUpLeft.className = 'dpad-diag dpad-diag-ul';
+        diagUpLeft.dataset.diag = 'up,left';
+
+        const diagUpRight = document.createElement('div');
+        diagUpRight.className = 'dpad-diag dpad-diag-ur';
+        diagUpRight.dataset.diag = 'up,right';
+
+        const diagDownLeft = document.createElement('div');
+        diagDownLeft.className = 'dpad-diag dpad-diag-dl';
+        diagDownLeft.dataset.diag = 'down,left';
+
+        const diagDownRight = document.createElement('div');
+        diagDownRight.className = 'dpad-diag dpad-diag-dr';
+        diagDownRight.dataset.diag = 'down,right';
+
+        const dpadCenter = document.createElement('div');
+        dpadCenter.className = 'dpad-center';
+
+        dpadContainer.appendChild(btnUp);
+        dpadContainer.appendChild(btnDown);
+        dpadContainer.appendChild(btnLeft);
+        dpadContainer.appendChild(btnRight);
+        dpadContainer.appendChild(diagUpLeft);
+        dpadContainer.appendChild(diagUpRight);
+        dpadContainer.appendChild(diagDownLeft);
+        dpadContainer.appendChild(diagDownRight);
+        dpadContainer.appendChild(dpadCenter);
+
+        const buttonsMap = {
+            'up': btnUp,
+            'down': btnDown,
+            'left': btnLeft,
+            'right': btnRight,
+            'up,left': diagUpLeft,
+            'up,right': diagUpRight,
+            'down,left': diagDownLeft,
+            'down,right': diagDownRight
+        };
+
+        let isPointerActive = false;
+
+        const processDpadTouch = (clientX, clientY) => {
+            const rect = dpadContainer.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dx = clientX - centerX;
+            const dy = clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Deadzone: if touch is too close to center, treat as inactive
+            const deadzone = rect.width * 0.12;
+            if (dist < deadzone) {
+                return [];
+            }
+
+            // Calculate angle in degrees (-180 to 180, 0 is Right, 90 is Down)
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+            // 8-Way Directional Angle Mapping (45-degree sectors)
+            if (angle >= -22.5 && angle < 22.5) {
+                return ['right'];
+            } else if (angle >= 22.5 && angle < 67.5) {
+                return ['down', 'right'];
+            } else if (angle >= 67.5 && angle < 112.5) {
+                return ['down'];
+            } else if (angle >= 112.5 && angle < 157.5) {
+                return ['down', 'left'];
+            } else if (angle >= 157.5 || angle < -157.5) {
+                return ['left'];
+            } else if (angle >= -157.5 && angle < -112.5) {
+                return ['up', 'left'];
+            } else if (angle >= -112.5 && angle < -67.5) {
+                return ['up'];
+            } else if (angle >= -67.5 && angle < -22.5) {
+                return ['up', 'right'];
+            }
+
+            return [];
+        };
+
+        const updateDpadState = (newKeys) => {
+            const newKeysSet = new Set(newKeys);
+
+            // Determine released keys
+            for (const keyId of this.activeDpadKeys) {
+                if (!newKeysSet.has(keyId)) {
+                    this.triggerKeyUp(keyId);
+                    if (buttonsMap[keyId]) buttonsMap[keyId].classList.remove('active');
+                }
+            }
+
+            // Determine newly pressed keys
+            let newlyPressed = false;
+            for (const keyId of newKeysSet) {
+                if (!this.activeDpadKeys.has(keyId)) {
+                    this.triggerKeyDown(keyId);
+                    if (buttonsMap[keyId]) buttonsMap[keyId].classList.add('active');
+                    newlyPressed = true;
+                }
+            }
+
+            // Update diagonal visual indicator states
+            diagUpLeft.classList.toggle('active', newKeysSet.has('up') && newKeysSet.has('left'));
+            diagUpRight.classList.toggle('active', newKeysSet.has('up') && newKeysSet.has('right'));
+            diagDownLeft.classList.toggle('active', newKeysSet.has('down') && newKeysSet.has('left'));
+            diagDownRight.classList.toggle('active', newKeysSet.has('down') && newKeysSet.has('right'));
+
+            if (newlyPressed) {
+                this.triggerHaptic();
+            }
+
+            this.activeDpadKeys = newKeysSet;
+        };
+
+        const releaseAllDpad = () => {
+            for (const keyId of this.activeDpadKeys) {
+                this.triggerKeyUp(keyId);
+                if (buttonsMap[keyId]) buttonsMap[keyId].classList.remove('active');
+            }
+            diagUpLeft.classList.remove('active');
+            diagUpRight.classList.remove('active');
+            diagDownLeft.classList.remove('active');
+            diagDownRight.classList.remove('active');
+            this.activeDpadKeys.clear();
+        };
+
+        const handlePointerDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isPointerActive = true;
+            dpadContainer.setPointerCapture(e.pointerId);
+            this.focusPlayer();
+            const keys = processDpadTouch(e.clientX, e.clientY);
+            updateDpadState(keys);
+        };
+
+        const handlePointerMove = (e) => {
+            if (!isPointerActive) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const keys = processDpadTouch(e.clientX, e.clientY);
+            updateDpadState(keys);
+        };
+
+        const handlePointerUp = (e) => {
+            if (!isPointerActive) return;
+            e.preventDefault();
+            e.stopPropagation();
+            isPointerActive = false;
+            try { dpadContainer.releasePointerCapture(e.pointerId); } catch (err) {}
+            releaseAllDpad();
+            this.focusPlayer();
+        };
+
+        dpadContainer.addEventListener('pointerdown', handlePointerDown);
+        dpadContainer.addEventListener('pointermove', handlePointerMove);
+        dpadContainer.addEventListener('pointerup', handlePointerUp);
+        dpadContainer.addEventListener('pointercancel', handlePointerUp);
+        dpadContainer.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        return dpadContainer;
+    }
+
+    /**
+     * Create individual action touch button with single-dispatch listeners
+     */
+    createActionButton(keyId, className) {
         const keyDef = this.keyDefinitions[keyId];
         const btn = document.createElement('button');
         btn.className = className;
@@ -301,13 +521,10 @@ class RuffleTouch {
             this.triggerKeyUp(keyId);
         };
 
-        // Pointer events for modern touch & mouse support
         btn.addEventListener('pointerdown', handlePress);
         btn.addEventListener('pointerup', handleRelease);
         btn.addEventListener('pointercancel', handleRelease);
         btn.addEventListener('pointerleave', handleRelease);
-
-        // Prevent context menu or text selection
         btn.addEventListener('contextmenu', (e) => e.preventDefault());
 
         return btn;
@@ -457,9 +674,19 @@ class RuffleTouch {
         hapticGroup.appendChild(hapticToggleLabel);
         uiSection.appendChild(hapticGroup);
 
-        // Fullscreen Toggle Button
-        const fullscreenGroup = document.createElement('div');
-        fullscreenGroup.className = 'ruffle-touch-setting-group';
+        // Quick Actions: Open SWF & Fullscreen
+        const quickActionsGroup = document.createElement('div');
+        quickActionsGroup.className = 'ruffle-touch-setting-group';
+
+        const openSwfDrawerBtn = document.createElement('button');
+        openSwfDrawerBtn.type = 'button';
+        openSwfDrawerBtn.className = 'ruffle-touch-btn-action';
+        openSwfDrawerBtn.innerHTML = '📁 Open / Change SWF File';
+        openSwfDrawerBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeSettingsDrawer();
+            this.promptFileSelection();
+        });
 
         const fullscreenBtn = document.createElement('button');
         fullscreenBtn.type = 'button';
@@ -470,8 +697,9 @@ class RuffleTouch {
             this.toggleFullscreen();
         });
 
-        fullscreenGroup.appendChild(fullscreenBtn);
-        uiSection.appendChild(fullscreenGroup);
+        quickActionsGroup.appendChild(openSwfDrawerBtn);
+        quickActionsGroup.appendChild(fullscreenBtn);
+        uiSection.appendChild(quickActionsGroup);
 
         // Section 2: Flash Save Data Management
         const saveSection = document.createElement('div');
@@ -845,13 +1073,15 @@ class RuffleTouch {
     }
 
     /**
-     * Dispatch keydown event
+     * Dispatch keydown event ONCE ONLY directly to window with bubbles: true
      */
     triggerKeyDown(keyId) {
         const def = this.keyDefinitions[keyId];
         if (!def) return;
 
-        const target = this.target || window;
+        if (this.activeKeys.has(keyId)) return; // Prevent key repeat if already active
+        this.activeKeys.add(keyId);
+
         const eventOptions = {
             key: def.key,
             code: def.code,
@@ -862,21 +1092,18 @@ class RuffleTouch {
             composed: true
         };
 
-        target.dispatchEvent(new KeyboardEvent('keydown', eventOptions));
-        // Also dispatch on window if target is specific element to guarantee listener capture
-        if (target !== window) {
-            window.dispatchEvent(new KeyboardEvent('keydown', eventOptions));
-        }
+        window.dispatchEvent(new KeyboardEvent('keydown', eventOptions));
     }
 
     /**
-     * Dispatch keyup event
+     * Dispatch keyup event ONCE ONLY directly to window
      */
     triggerKeyUp(keyId) {
         const def = this.keyDefinitions[keyId];
         if (!def) return;
 
-        const target = this.target || window;
+        this.activeKeys.delete(keyId);
+
         const eventOptions = {
             key: def.key,
             code: def.code,
@@ -887,10 +1114,7 @@ class RuffleTouch {
             composed: true
         };
 
-        target.dispatchEvent(new KeyboardEvent('keyup', eventOptions));
-        if (target !== window) {
-            window.dispatchEvent(new KeyboardEvent('keyup', eventOptions));
-        }
+        window.dispatchEvent(new KeyboardEvent('keyup', eventOptions));
     }
 
     /**

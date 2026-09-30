@@ -16,31 +16,32 @@
 
 .ruffle-touch-overlay,
 .ruffle-touch-toolbar-btn,
-.ruffle-touch-btn {
+.ruffle-touch-btn,
+.ruffle-touch-dpad {
   touch-action: none;
 }
 
 /* Floating Toolbar (Top Right Corner) */
 .ruffle-touch-toolbar {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
   z-index: 10000;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(8px, 2vw, 12px);
 }
 
 .ruffle-touch-toolbar-btn {
-  width: 48px;
-  height: 48px;
+  width: clamp(40px, 8vw, 48px);
+  height: clamp(40px, 8vw, 48px);
   border-radius: 50%;
   background: rgba(20, 20, 25, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1.5px solid rgba(255, 255, 255, 0.35);
   color: #ffffff;
-  font-size: 22px;
+  font-size: clamp(18px, 4vw, 22px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -55,7 +56,7 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Gamepad Overlay Container */
+/* Gamepad Overlay Container - Pushed to safe margins / letterbox areas */
 .ruffle-touch-overlay {
   position: fixed;
   top: 0;
@@ -67,7 +68,10 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 24px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
@@ -98,69 +102,93 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.1s ease, transform 0.1s ease;
+  transition: background 0.1s ease, transform 0.1s ease, border-color 0.1s ease;
 }
 
 .ruffle-touch-btn:active,
 .ruffle-touch-btn.active {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(0.92);
+  background: rgba(88, 166, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: scale(0.94);
 }
 
-/* D-PAD Container (Bottom-Left) */
+/* 8-Way D-PAD Container (Bottom-Left) */
 .ruffle-touch-dpad {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: clamp(130px, 25vw, 170px);
+  height: clamp(130px, 25vw, 170px);
   pointer-events: auto;
   transition: transform 0.15s ease;
 }
 
-.ruffle-touch-dpad .ruffle-touch-btn {
+.ruffle-touch-dpad .dpad-btn {
   position: absolute;
-  width: 52px;
-  height: 52px;
-  font-size: 20px;
+  width: 34%;
+  height: 34%;
+  font-size: clamp(16px, 3.5vw, 22px);
   border-radius: 8px;
 }
 
 .dpad-up {
   top: 0;
-  left: 54px;
+  left: 33%;
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
 }
 
 .dpad-down {
   bottom: 0;
-  left: 54px;
+  left: 33%;
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
 
 .dpad-left {
-  top: 54px;
+  top: 33%;
   left: 0;
   border-top-left-radius: 12px;
   border-bottom-left-radius: 12px;
 }
 
 .dpad-right {
-  top: 54px;
+  top: 33%;
   right: 0;
   border-top-right-radius: 12px;
   border-bottom-right-radius: 12px;
 }
 
+/* Diagonal Visual Hit Zones & Highlights */
+.dpad-diag {
+  position: absolute;
+  width: 32%;
+  height: 32%;
+  border-radius: 8px;
+  pointer-events: none;
+  transition: background 0.1s ease;
+  background: transparent;
+  z-index: 2;
+}
+
+.dpad-diag-ul { top: 2%; left: 2%; }
+.dpad-diag-ur { top: 2%; right: 2%; }
+.dpad-diag-dl { bottom: 2%; left: 2%; }
+.dpad-diag-dr { bottom: 2%; right: 2%; }
+
+.dpad-diag.active {
+  background: rgba(88, 166, 255, 0.25);
+  border: 1px dashed rgba(255, 255, 255, 0.5);
+}
+
 .dpad-center {
   position: absolute;
-  top: 54px;
-  left: 54px;
-  width: 52px;
-  height: 52px;
+  top: 33%;
+  left: 33%;
+  width: 34%;
+  height: 34%;
   background: rgba(20, 20, 25, 0.5);
   border: 1.5px solid rgba(255, 255, 255, 0.2);
   pointer-events: none;
+  border-radius: 6px;
 }
 
 /* Action Buttons Container (Bottom-Right) */
@@ -168,37 +196,31 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 16px;
+  gap: clamp(10px, 2vh, 18px);
   pointer-events: auto;
   transition: transform 0.15s ease;
 }
 
 .action-group {
   display: flex;
-  gap: 12px;
+  gap: clamp(8px, 1.8vw, 14px);
   align-items: center;
 }
 
 /* Action Buttons (Z, X) */
 .action-z, .action-x {
-  width: 58px;
-  height: 58px;
+  width: clamp(48px, 10vw, 62px);
+  height: clamp(48px, 10vw, 62px);
   border-radius: 50%;
-  font-size: 22px;
-}
-
-.action-z:active, .action-z.active,
-.action-x:active, .action-x.active {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(0.92);
+  font-size: clamp(18px, 3.8vw, 24px);
 }
 
 /* Secondary Action Buttons (Space, Enter) */
 .action-space, .action-enter {
-  height: 40px;
-  padding: 0 16px;
+  height: clamp(34px, 6vh, 42px);
+  padding: 0 clamp(10px, 2vw, 18px);
   border-radius: 20px;
-  font-size: 13px;
+  font-size: clamp(11px, 2.2vw, 13px);
   letter-spacing: 0.5px;
 }
 
@@ -231,7 +253,7 @@
   width: 320px;
   max-width: 85vw;
   height: 100vh;
-  background: rgba(18, 22, 28, 0.85);
+  background: rgba(18, 22, 28, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-left: 1px solid rgba(255, 255, 255, 0.15);
@@ -458,38 +480,18 @@
   border-color: rgba(218, 54, 51, 0.8);
 }
 
-/* Responsive Scaling for smaller screens */
-@media (max-width: 600px) {
+/* Landscape / Widescreen Adjustments: Push controls outwards into letterbox padding */
+@media (min-aspect-ratio: 16/9) {
   .ruffle-touch-overlay {
-    padding: 12px;
+    padding-left: clamp(16px, 4vw, 40px);
+    padding-right: clamp(16px, 4vw, 40px);
   }
+}
 
-  .ruffle-touch-dpad {
-    width: 140px;
-    height: 140px;
-  }
-
-  .ruffle-touch-dpad .ruffle-touch-btn {
-    width: 46px;
-    height: 46px;
-    font-size: 18px;
-  }
-
-  .dpad-up, .dpad-down { left: 47px; }
-  .dpad-left { top: 47px; }
-  .dpad-right { top: 47px; }
-  .dpad-center { top: 47px; left: 47px; width: 46px; height: 46px; }
-
-  .action-z, .action-x {
-    width: 50px;
-    height: 50px;
-    font-size: 18px;
-  }
-
-  .action-space, .action-enter {
-    height: 36px;
-    padding: 0 12px;
-    font-size: 11px;
+/* Ultra Small Screens Responsive Scaling */
+@media (max-width: 480px) {
+  .ruffle-touch-overlay {
+    padding: 10px;
   }
 
   .ruffle-touch-drawer {
