@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ruffle Touch Demo</title>
+  <link rel="stylesheet" href="src/ruffle-touch.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0d0f12;
+      color: #f0f4f8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background-color: #161b22;
+      border-bottom: 1px solid #30363d;
+      z-index: 10;
+    }
+
+    .title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      display: none;
+    }
+
+    .btn-upload {
+      background-color: #238636;
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-upload:hover {
+      background-color: #2ea043;
+    }
+
+    #player-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #050508;
+      position: relative;
+    }
+
+    .placeholder-notice {
+      text-align: center;
+      color: #8b949e;
+      padding: 20px;
+    }
+
+    .placeholder-notice p {
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+
+    ruffle-player {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+
+  <!-- Load official Ruffle Web build via unpkg CDN -->
+  <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="title">
+        <span>🎮 Ruffle Touch Gamepad</span>
+      </div>
+      <div class="controls-bar">
+        <div class="file-input-wrapper">
+          <label for="swf-file" class="btn-upload">
+            📁 Open SWF File
+          </label>
+          <input type="file" id="swf-file" accept=".swf">
+        </div>
+      </div>
+    </header>
+
+    <div id="player-container">
+      <div id="placeholder" class="placeholder-notice">
+        <h3>No Flash (.swf) File Loaded</h3>
+        <p>Select a local .swf file using the button above to start playing with touch controls.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load RuffleTouch script -->
+  <script src="src/ruffle-touch.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      let rufflePlayerInstance = null;
+
+      // Instantiate RuffleTouch controller overlay attached to #app container
+      const ruffleTouch = new RuffleTouch({
+        container: document.getElementById('app'),
+        visible: true
+      });
+
+      const fileInput = document.getElementById('swf-file');
+      const playerContainer = document.getElementById('player-container');
+      const placeholder = document.getElementById('placeholder');
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Obtain Ruffle player instance using Ruffle API window.RufflePlayer
+        const ruffle = window.RufflePlayer ? window.RufflePlayer.newest() : null;
+        if (!ruffle) {
+          alert('Ruffle failed to initialize from CDN.');
+          return;
+        }
+
+        // Clean up previous instance if exists
+        if (rufflePlayerInstance) {
+          playerContainer.removeChild(rufflePlayerInstance);
+        } else if (placeholder) {
+          placeholder.style.display = 'none';
+        }
+
+        // Create player element using Ruffle JavaScript API
+        rufflePlayerInstance = ruffle.createPlayer();
+        playerContainer.appendChild(rufflePlayerInstance);
+
+        // Connect touch gamepad to the player element
+        ruffleTouch.setPlayer(rufflePlayerInstance);
+        ruffleTouch.setTarget(rufflePlayerInstance);
+
+        // Load local SWF file array buffer
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          rufflePlayerInstance.load({
+            data: event.target.result,
+            allowScriptAccess: true
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    });
+  </script>
+</body>
+</html>
