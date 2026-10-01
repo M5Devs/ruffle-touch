@@ -577,3 +577,15 @@
   font-size: 0.85rem;
   color: #c9d1d9;
 }
+
+
+/* Download / Archival Button Styles */
+.ruffle-touch-download-swf {
+  color: #3fb950;
+  border-color: rgba(63, 185, 80, 0.5);
+}
+
+.ruffle-touch-download-swf:hover {
+  background: rgba(63, 185, 80, 0.2);
+  border-color: rgba(63, 185, 80, 0.8);
+}
