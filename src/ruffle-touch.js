@@ -1668,6 +1668,7 @@ class RuffleTouch {
     static async fetchWithCorsProxy(targetUrl, responseType = "arraybuffer", timeoutMs = 10000) {
         const proxies = [
             (u) => u,
+            (u) => `https://m5-cors.claus-valca67.workers.dev/?url=${encodeURIComponent(u)}`,
             (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
             (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
         ];
