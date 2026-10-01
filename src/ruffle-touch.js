@@ -1634,29 +1634,72 @@ class RuffleTouch {
      * @param {string} targetUrl
      * @param {string} [responseType="arraybuffer"] "arraybuffer" or "text"
      */
-    static async fetchWithCorsProxy(targetUrl, responseType = "arraybuffer") {
+    /**
+     * Check if ArrayBuffer or Uint8Array contains valid SWF magic bytes ('FWS', 'CWS', 'ZWS')
+     * @param {ArrayBuffer|Uint8Array} buffer
+     * @returns {boolean}
+     */
+    static isValidSwf(buffer) {
+        if (!buffer) return false;
+        const byteLength = buffer.byteLength !== undefined ? buffer.byteLength : buffer.length;
+        if (byteLength < 3) return false;
+
+        let bytes;
+        if (buffer instanceof Uint8Array) {
+            bytes = buffer.subarray(0, 3);
+        } else if (buffer instanceof ArrayBuffer) {
+            bytes = new Uint8Array(buffer, 0, 3);
+        } else if (ArrayBuffer.isView(buffer)) {
+            bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, 3);
+        } else {
+            return false;
+        }
+
+        const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2]);
+        return magic === 'FWS' || magic === 'CWS' || magic === 'ZWS';
+    }
+
+    /**
+     * Helper to fetch a resource with fallback CORS proxies
+     * @param {string} targetUrl
+     * @param {string} [responseType="arraybuffer"] "arraybuffer" or "text"
+     * @param {number} [timeoutMs=10000] Timeout per proxy attempt in milliseconds
+     */
+    static async fetchWithCorsProxy(targetUrl, responseType = "arraybuffer", timeoutMs = 10000) {
         const proxies = [
             (u) => u,
             (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-            (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`
+            (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
         ];
 
         let lastError = null;
 
         for (const makeUrl of proxies) {
             const proxyUrl = makeUrl(targetUrl);
+            let timeoutId = null;
+            let controller = null;
+
+            if (typeof AbortController !== 'undefined') {
+                controller = new AbortController();
+                timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            }
+
             try {
-                const res = await fetch(proxyUrl);
+                const fetchOptions = controller ? { signal: controller.signal } : {};
+                const res = await fetch(proxyUrl, fetchOptions);
+                if (timeoutId) clearTimeout(timeoutId);
+
                 if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
                 if (responseType === "text") {
                     const text = await res.text();
-                    if (text) return text;
+                    if (text !== null && text !== undefined) return text;
                 } else {
                     const buf = await res.arrayBuffer();
                     if (buf && buf.byteLength > 0) return buf;
                 }
             } catch (err) {
+                if (timeoutId) clearTimeout(timeoutId);
                 lastError = err;
             }
         }
@@ -1685,23 +1728,70 @@ class RuffleTouch {
             statusCallback("Downloading SWF file...", false);
             const arrayBuffer = await RuffleTouch.fetchWithCorsProxy(url, "arraybuffer");
 
-            // Extract filename from URL
-            const urlPath = url.split("?")[0];
-            const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
+            if (RuffleTouch.isValidSwf(arrayBuffer)) {
+                const urlPath = url.split("?")[0];
+                const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
 
-            return {
-                data: arrayBuffer,
-                swfUrl: url,
-                filename: fileName
-            };
+                return {
+                    data: arrayBuffer,
+                    swfUrl: url,
+                    filename: fileName
+                };
+            }
+
+            // If direct fetch didn't yield valid magic bytes, attempt HTML scraping fallback in case URL returned HTML
+            let htmlText = "";
+            try {
+                const decoder = new TextDecoder("utf-8");
+                htmlText = decoder.decode(arrayBuffer);
+            } catch (e) {}
+
+            const extractedSwfUrl = RuffleTouch.extractSwfUrlFromHtml(htmlText, url);
+            if (extractedSwfUrl) {
+                statusCallback(`SWF found: ${extractedSwfUrl.split("/").pop()}. Downloading...`, false);
+                const extractedBuffer = await RuffleTouch.fetchWithCorsProxy(extractedSwfUrl, "arraybuffer");
+                if (RuffleTouch.isValidSwf(extractedBuffer)) {
+                    const urlPath = extractedSwfUrl.split("?")[0];
+                    const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
+                    return {
+                        data: extractedBuffer,
+                        swfUrl: extractedSwfUrl,
+                        filename: fileName
+                    };
+                }
+            }
+
+            throw new Error("Downloaded file is not a valid Flash SWF (invalid magic bytes).");
         } else {
+            statusCallback("Downloading content...", false);
+            let arrayBuffer = null;
+            try {
+                arrayBuffer = await RuffleTouch.fetchWithCorsProxy(url, "arraybuffer");
+            } catch (err) {
+                throw new Error("Unable to fetch URL content. Check the URL and try again.");
+            }
+
+            // Check if the fetched data is directly a valid SWF despite non-.swf URL extension
+            if (RuffleTouch.isValidSwf(arrayBuffer)) {
+                const urlPath = url.split("?")[0];
+                let fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
+                if (!fileName.toLowerCase().endsWith(".swf")) {
+                    fileName += ".swf";
+                }
+                return {
+                    data: arrayBuffer,
+                    swfUrl: url,
+                    filename: fileName
+                };
+            }
+
+            // Otherwise, treat as HTML and scrape for embedded SWF URLs
             statusCallback("Extracting SWF from webpage...", false);
             let htmlText = "";
             try {
-                htmlText = await RuffleTouch.fetchWithCorsProxy(url, "text");
-            } catch (err) {
-                throw new Error("Unable to fetch webpage content. Check the URL and try again.");
-            }
+                const decoder = new TextDecoder("utf-8");
+                htmlText = decoder.decode(arrayBuffer);
+            } catch (e) {}
 
             const extractedSwfUrl = RuffleTouch.extractSwfUrlFromHtml(htmlText, url);
             if (!extractedSwfUrl) {
@@ -1709,13 +1799,17 @@ class RuffleTouch {
             }
 
             statusCallback(`SWF found: ${extractedSwfUrl.split("/").pop()}. Downloading...`, false);
-            const arrayBuffer = await RuffleTouch.fetchWithCorsProxy(extractedSwfUrl, "arraybuffer");
+            const extractedBuffer = await RuffleTouch.fetchWithCorsProxy(extractedSwfUrl, "arraybuffer");
+
+            if (!RuffleTouch.isValidSwf(extractedBuffer)) {
+                throw new Error("Extracted SWF link did not return a valid Flash file (invalid magic bytes).");
+            }
 
             const urlPath = extractedSwfUrl.split("?")[0];
             const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
 
             return {
-                data: arrayBuffer,
+                data: extractedBuffer,
                 swfUrl: extractedSwfUrl,
                 filename: fileName
             };
