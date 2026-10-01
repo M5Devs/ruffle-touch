@@ -54,6 +54,7 @@ class RuffleTouch {
         this.openSwfBtn = null;
         this.drawerElement = null;
         this.drawerBackdrop = null;
+        this.keyboardElement = null;
 
         // Active key tracking to eliminate duplicate events
         this.activeKeys = new Set();
@@ -215,22 +216,25 @@ class RuffleTouch {
     }
 
     applySettings() {
-        if (!this.overlayElement) return;
-
-        if (this.visible) {
+        if (this.overlayElement && this.visible) {
             this.overlayElement.style.opacity = this.settings.opacity;
         }
-
-        const dpad = this.overlayElement.querySelector('.ruffle-touch-dpad');
-        const actions = this.overlayElement.querySelector('.ruffle-touch-actions');
-
-        if (dpad) {
-            dpad.style.transform = `scale(${this.settings.scale})`;
-            dpad.style.transformOrigin = 'bottom left';
+        if (this.keyboardElement && this.visible) {
+            this.keyboardElement.style.opacity = this.settings.opacity;
         }
-        if (actions) {
-            actions.style.transform = `scale(${this.settings.scale})`;
-            actions.style.transformOrigin = 'bottom right';
+
+        if (this.overlayElement) {
+            const dpad = this.overlayElement.querySelector('.ruffle-touch-dpad');
+            const actions = this.overlayElement.querySelector('.ruffle-touch-actions');
+
+            if (dpad) {
+                dpad.style.transform = `scale(${this.settings.scale})`;
+                dpad.style.transformOrigin = 'bottom left';
+            }
+            if (actions) {
+                actions.style.transform = `scale(${this.settings.scale})`;
+                actions.style.transformOrigin = 'bottom right';
+            }
         }
     }
 
@@ -326,7 +330,7 @@ class RuffleTouch {
      * Set input mode ('gamepad' or 'mouse')
      */
     setMode(mode, showToast = true) {
-        if (mode !== 'gamepad' && mode !== 'mouse') return;
+        if (mode !== 'gamepad' && mode !== 'mouse' && mode !== 'keyboard') return;
 
         this.inputMode = mode;
         this.settings.inputMode = mode;
@@ -335,8 +339,12 @@ class RuffleTouch {
         if (this.modeBtn) {
             if (this.inputMode === 'mouse') {
                 this.modeBtn.innerHTML = '🖱️';
+                this.modeBtn.setAttribute('aria-label', 'Switch to Keyboard Mode');
+                this.modeBtn.title = 'Mouse Mode active - Click to switch to Keyboard Mode';
+            } else if (this.inputMode === 'keyboard') {
+                this.modeBtn.innerHTML = '⌨️';
                 this.modeBtn.setAttribute('aria-label', 'Switch to Gamepad Mode');
-                this.modeBtn.title = 'Mouse Mode active - Click to switch to Gamepad Mode';
+                this.modeBtn.title = 'Keyboard Mode active - Click to switch to Gamepad Mode';
             } else {
                 this.modeBtn.innerHTML = '🎮';
                 this.modeBtn.setAttribute('aria-label', 'Switch to Mouse Mode');
@@ -344,19 +352,32 @@ class RuffleTouch {
             }
         }
 
-        // In Mouse Mode, hide controls overlay so touch directly interacts with canvas
+        // In Mouse or Keyboard Mode, hide Gamepad D-pad & action overlay
         if (this.overlayElement) {
-            if (this.inputMode === 'mouse') {
+            if (this.inputMode === 'mouse' || this.inputMode === 'keyboard') {
                 this.overlayElement.classList.add('ruffle-touch-hidden');
             } else if (this.visible) {
                 this.overlayElement.classList.remove('ruffle-touch-hidden');
             }
         }
 
+        // In Keyboard Mode, show virtual keyboard dock; otherwise hide it
+        if (this.keyboardElement) {
+            if (this.inputMode === 'keyboard' && this.visible) {
+                this.keyboardElement.classList.remove('ruffle-touch-hidden');
+                this.keyboardElement.style.opacity = this.settings.opacity;
+            } else {
+                this.keyboardElement.classList.add('ruffle-touch-hidden');
+            }
+        }
+
         if (showToast) {
-            const toastText = this.inputMode === 'mouse'
-                ? '🖱️ Mouse Mode (Touch directly controls canvas)'
-                : '🎮 Gamepad Mode (Virtual controls enabled)';
+            let toastText = '🎮 Gamepad Mode (Virtual controls enabled)';
+            if (this.inputMode === 'mouse') {
+                toastText = '🖱️ Mouse Mode (Touch directly controls canvas)';
+            } else if (this.inputMode === 'keyboard') {
+                toastText = '⌨️ Keyboard Mode (Virtual keyboard active)';
+            }
             this.showToast(toastText);
         }
     }
@@ -365,7 +386,14 @@ class RuffleTouch {
      * Toggle between Gamepad Mode and Mouse Mode
      */
     toggleMode() {
-        const newMode = this.inputMode === 'gamepad' ? 'mouse' : 'gamepad';
+        let newMode = 'mouse';
+        if (this.inputMode === 'gamepad') {
+            newMode = 'mouse';
+        } else if (this.inputMode === 'mouse') {
+            newMode = 'keyboard';
+        } else if (this.inputMode === 'keyboard') {
+            newMode = 'gamepad';
+        }
         this.setMode(newMode, true);
     }
 
@@ -391,6 +419,134 @@ class RuffleTouch {
                 this.toastElement.classList.remove('show');
             }
         }, 2200);
+    }
+
+    /**
+     * Build Virtual Keyboard dock DOM structure
+     */
+    createVirtualKeyboard() {
+        const kbDock = document.createElement('div');
+        kbDock.className = 'ruffle-touch-keyboard';
+
+        const rows = [
+            // Row 1: Esc, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, Backspace
+            [
+                { key: 'Escape', code: 'Escape', keyCode: 27, label: 'Esc', class: 'key-sm' },
+                { key: '1', code: 'Digit1', keyCode: 49, label: '1' },
+                { key: '2', code: 'Digit2', keyCode: 50, label: '2' },
+                { key: '3', code: 'Digit3', keyCode: 51, label: '3' },
+                { key: '4', code: 'Digit4', keyCode: 52, label: '4' },
+                { key: '5', code: 'Digit5', keyCode: 53, label: '5' },
+                { key: '6', code: 'Digit6', keyCode: 54, label: '6' },
+                { key: '7', code: 'Digit7', keyCode: 55, label: '7' },
+                { key: '8', code: 'Digit8', keyCode: 56, label: '8' },
+                { key: '9', code: 'Digit9', keyCode: 57, label: '9' },
+                { key: '0', code: 'Digit0', keyCode: 48, label: '0' },
+                { key: 'Backspace', code: 'Backspace', keyCode: 8, label: '⌫', class: 'key-backspace' }
+            ],
+            // Row 2: Tab, Q, W, E, R, T, Y, U, I, O, P
+            [
+                { key: 'Tab', code: 'Tab', keyCode: 9, label: 'Tab', class: 'key-tab' },
+                { key: 'q', code: 'KeyQ', keyCode: 81, label: 'Q' },
+                { key: 'w', code: 'KeyW', keyCode: 87, label: 'W' },
+                { key: 'e', code: 'KeyE', keyCode: 69, label: 'E' },
+                { key: 'r', code: 'KeyR', keyCode: 82, label: 'R' },
+                { key: 't', code: 'KeyT', keyCode: 84, label: 'T' },
+                { key: 'y', code: 'KeyY', keyCode: 89, label: 'Y' },
+                { key: 'u', code: 'KeyU', keyCode: 85, label: 'U' },
+                { key: 'i', code: 'KeyI', keyCode: 73, label: 'I' },
+                { key: 'o', code: 'KeyO', keyCode: 79, label: 'O' },
+                { key: 'p', code: 'KeyP', keyCode: 80, label: 'P' }
+            ],
+            // Row 3: Caps, A, S, D, F, G, H, J, K, L, Enter
+            [
+                { key: 'CapsLock', code: 'CapsLock', keyCode: 20, label: 'Caps', class: 'key-caps' },
+                { key: 'a', code: 'KeyA', keyCode: 65, label: 'A' },
+                { key: 's', code: 'KeyS', keyCode: 83, label: 'S' },
+                { key: 'd', code: 'KeyD', keyCode: 68, label: 'D' },
+                { key: 'f', code: 'KeyF', keyCode: 70, label: 'F' },
+                { key: 'g', code: 'KeyG', keyCode: 71, label: 'G' },
+                { key: 'h', code: 'KeyH', keyCode: 72, label: 'H' },
+                { key: 'j', code: 'KeyJ', keyCode: 74, label: 'J' },
+                { key: 'k', code: 'KeyK', keyCode: 75, label: 'K' },
+                { key: 'l', code: 'KeyL', keyCode: 76, label: 'L' },
+                { key: 'Enter', code: 'Enter', keyCode: 13, label: '↵ Enter', class: 'key-enter' }
+            ],
+            // Row 4: Shift, Z, X, C, V, B, N, M, Space, Ctrl
+            [
+                { key: 'Shift', code: 'ShiftLeft', keyCode: 16, label: '⇧ Shift', class: 'key-shift' },
+                { key: 'z', code: 'KeyZ', keyCode: 90, label: 'Z' },
+                { key: 'x', code: 'KeyX', keyCode: 88, label: 'X' },
+                { key: 'c', code: 'KeyC', keyCode: 67, label: 'C' },
+                { key: 'v', code: 'KeyV', keyCode: 86, label: 'V' },
+                { key: 'b', code: 'KeyB', keyCode: 66, label: 'B' },
+                { key: 'n', code: 'KeyN', keyCode: 78, label: 'N' },
+                { key: 'm', code: 'KeyM', keyCode: 77, label: 'M' },
+                { key: ' ', code: 'Space', keyCode: 32, label: 'Space', class: 'key-space' },
+                { key: 'Control', code: 'ControlLeft', keyCode: 17, label: 'Ctrl', class: 'key-ctrl' }
+            ]
+        ];
+
+        rows.forEach(rowKeys => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'keyboard-row';
+
+            rowKeys.forEach(def => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'keyboard-key' + (def.class ? ' ' + def.class : '');
+                btn.textContent = def.label;
+
+                const handlePress = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    btn.classList.add('active');
+                    this.triggerHaptic();
+                    this.focusPlayer();
+
+                    const eventOptions = {
+                        key: def.key,
+                        code: def.code,
+                        keyCode: def.keyCode,
+                        which: def.keyCode,
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true
+                    };
+                    window.dispatchEvent(new KeyboardEvent('keydown', eventOptions));
+                };
+
+                const handleRelease = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    btn.classList.remove('active');
+                    this.focusPlayer();
+
+                    const eventOptions = {
+                        key: def.key,
+                        code: def.code,
+                        keyCode: def.keyCode,
+                        which: def.keyCode,
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true
+                    };
+                    window.dispatchEvent(new KeyboardEvent('keyup', eventOptions));
+                };
+
+                btn.addEventListener('pointerdown', handlePress);
+                btn.addEventListener('pointerup', handleRelease);
+                btn.addEventListener('pointercancel', handleRelease);
+                btn.addEventListener('pointerleave', handleRelease);
+                btn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                rowDiv.appendChild(btn);
+            });
+
+            kbDock.appendChild(rowDiv);
+        });
+
+        return kbDock;
     }
 
     /**
@@ -513,9 +669,14 @@ class RuffleTouch {
         // Settings Drawer & Backdrop
         this.initSettingsDrawer();
 
+        // Virtual Keyboard Dock
+        this.keyboardElement = this.createVirtualKeyboard();
+        this.keyboardElement.classList.add('ruffle-touch-hidden');
+
         // Mount to container
         this.container.appendChild(this.toolbarElement);
         this.container.appendChild(this.overlayElement);
+        this.container.appendChild(this.keyboardElement);
         this.container.appendChild(this.drawerBackdrop);
         this.container.appendChild(this.drawerElement);
 
@@ -1476,10 +1637,19 @@ class RuffleTouch {
     toggleVisibility() {
         this.visible = !this.visible;
         if (this.visible) {
-            this.overlayElement.classList.remove('ruffle-touch-hidden');
-            this.overlayElement.style.opacity = this.settings.opacity;
+            if (this.inputMode !== 'mouse' && this.inputMode !== 'keyboard') {
+                this.overlayElement.classList.remove('ruffle-touch-hidden');
+                this.overlayElement.style.opacity = this.settings.opacity;
+            }
+            if (this.inputMode === 'keyboard') {
+                this.keyboardElement.classList.remove('ruffle-touch-hidden');
+                this.keyboardElement.style.opacity = this.settings.opacity;
+            }
         } else {
             this.overlayElement.classList.add('ruffle-touch-hidden');
+            if (this.keyboardElement) {
+                this.keyboardElement.classList.add('ruffle-touch-hidden');
+            }
         }
     }
 
@@ -1488,8 +1658,14 @@ class RuffleTouch {
      */
     show() {
         this.visible = true;
-        this.overlayElement.classList.remove('ruffle-touch-hidden');
-        this.overlayElement.style.opacity = this.settings.opacity;
+        if (this.inputMode !== 'mouse' && this.inputMode !== 'keyboard') {
+            this.overlayElement.classList.remove('ruffle-touch-hidden');
+            this.overlayElement.style.opacity = this.settings.opacity;
+        }
+        if (this.inputMode === 'keyboard' && this.keyboardElement) {
+            this.keyboardElement.classList.remove('ruffle-touch-hidden');
+            this.keyboardElement.style.opacity = this.settings.opacity;
+        }
     }
 
     /**
@@ -1498,6 +1674,9 @@ class RuffleTouch {
     hide() {
         this.visible = false;
         this.overlayElement.classList.add('ruffle-touch-hidden');
+        if (this.keyboardElement) {
+            this.keyboardElement.classList.add('ruffle-touch-hidden');
+        }
     }
 
     /**
@@ -1509,6 +1688,9 @@ class RuffleTouch {
         }
         if (this.overlayElement && this.overlayElement.parentNode) {
             this.overlayElement.parentNode.removeChild(this.overlayElement);
+        }
+        if (this.keyboardElement && this.keyboardElement.parentNode) {
+            this.keyboardElement.parentNode.removeChild(this.keyboardElement);
         }
         if (this.drawerBackdrop && this.drawerBackdrop.parentNode) {
             this.drawerBackdrop.parentNode.removeChild(this.drawerBackdrop);
