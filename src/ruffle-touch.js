@@ -3,6 +3,27 @@
  */
 
 class RuffleTouch {
+    static AVAILABLE_KEYS = {
+        'ArrowUp': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38, label: 'Up Arrow' },
+        'ArrowDown': { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, label: 'Down Arrow' },
+        'ArrowLeft': { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, label: 'Left Arrow' },
+        'ArrowRight': { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, label: 'Right Arrow' },
+        'Space': { key: ' ', code: 'Space', keyCode: 32, label: 'Space' },
+        'Enter': { key: 'Enter', code: 'Enter', keyCode: 13, label: 'Enter' },
+        'KeyZ': { key: 'z', code: 'KeyZ', keyCode: 90, label: 'Z' },
+        'KeyX': { key: 'x', code: 'KeyX', keyCode: 88, label: 'X' },
+        'KeyA': { key: 'a', code: 'KeyA', keyCode: 65, label: 'A' },
+        'KeyB': { key: 'b', code: 'KeyB', keyCode: 66, label: 'B' },
+        'KeyY': { key: 'y', code: 'KeyY', keyCode: 89, label: 'Y' },
+        'ShiftLeft': { key: 'Shift', code: 'ShiftLeft', keyCode: 16, label: 'Shift' },
+        'ControlLeft': { key: 'Control', code: 'ControlLeft', keyCode: 17, label: 'Ctrl' },
+        'KeyW': { key: 'w', code: 'KeyW', keyCode: 87, label: 'W' },
+        'KeyS': { key: 's', code: 'KeyS', keyCode: 83, label: 'S' },
+        'KeyD': { key: 'd', code: 'KeyD', keyCode: 68, label: 'D' },
+        'KeyJ': { key: 'j', code: 'KeyJ', keyCode: 74, label: 'J' },
+        'KeyK': { key: 'k', code: 'KeyK', keyCode: 75, label: 'K' }
+    };
+
     /**
      * @param {Object} options Configuration options
      * @param {HTMLElement|string} [options.container] Parent container element where controls overlay will be attached (defaults to document.body)
@@ -40,16 +61,37 @@ class RuffleTouch {
 
         this.settings = this.loadSettings();
 
-        this.keyDefinitions = {
-            'up': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38, label: '▲' },
-            'down': { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, label: '▼' },
-            'left': { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, label: '◀' },
-            'right': { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, label: '▶' },
-            'space': { key: ' ', code: 'Space', keyCode: 32, label: 'SPACE' },
-            'enter': { key: 'Enter', code: 'Enter', keyCode: 13, label: 'ENTER' },
-            'z': { key: 'z', code: 'KeyZ', keyCode: 90, label: 'Z' },
-            'x': { key: 'x', code: 'KeyX', keyCode: 88, label: 'X' }
+        // Active mode: 'gamepad' or 'mouse'
+        this.inputMode = this.settings.inputMode || 'gamepad';
+        this.modeBtn = null;
+        this.toastElement = null;
+        this.toastTimeout = null;
+
+        // Preset Key Mappings Definition Table
+        this.presets = {
+            'classic': {
+                'up': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38, label: '▲' },
+                'down': { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, label: '▼' },
+                'left': { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, label: '◀' },
+                'right': { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, label: '▶' },
+                'space': { key: ' ', code: 'Space', keyCode: 32, label: 'SPACE' },
+                'enter': { key: 'Enter', code: 'Enter', keyCode: 13, label: 'ENTER' },
+                'z': { key: 'z', code: 'KeyZ', keyCode: 90, label: 'Z' },
+                'x': { key: 'x', code: 'KeyX', keyCode: 88, label: 'X' }
+            },
+            'wasd': {
+                'up': { key: 'w', code: 'KeyW', keyCode: 87, label: 'W' },
+                'down': { key: 's', code: 'KeyS', keyCode: 83, label: 'S' },
+                'left': { key: 'a', code: 'KeyA', keyCode: 65, label: 'A' },
+                'right': { key: 'd', code: 'KeyD', keyCode: 68, label: 'D' },
+                'space': { key: ' ', code: 'Space', keyCode: 32, label: 'SPACE' },
+                'enter': { key: 'Enter', code: 'Enter', keyCode: 13, label: 'ENTER' },
+                'z': { key: 'j', code: 'KeyJ', keyCode: 74, label: 'J' },
+                'x': { key: 'k', code: 'KeyK', keyCode: 75, label: 'K' }
+            }
         };
+
+        this.keyDefinitions = this.getEffectiveMappings();
 
         this.init();
         this.attachBackgroundTouchTrap();
@@ -62,7 +104,10 @@ class RuffleTouch {
         const defaults = {
             opacity: 1.0,
             scale: 1.0,
-            haptic: true
+            haptic: true,
+            inputMode: 'gamepad', // 'gamepad' or 'mouse'
+            mappingPreset: 'classic', // 'classic', 'wasd', or 'custom'
+            customMappings: null
         };
         try {
             const saved = localStorage.getItem('ruffle_touch_settings');
@@ -90,6 +135,79 @@ class RuffleTouch {
     /**
      * Apply UI customization settings (opacity and scale)
      */
+
+    /**
+     * Update labels on active touch buttons when mappings change
+     */
+    updateButtonLabels() {
+        if (!this.overlayElement) return;
+
+        const actionButtons = {
+            'z': this.overlayElement.querySelector('.action-z'),
+            'x': this.overlayElement.querySelector('.action-x'),
+            'space': this.overlayElement.querySelector('.action-space'),
+            'enter': this.overlayElement.querySelector('.action-enter')
+        };
+
+        for (const [keyId, btn] of Object.entries(actionButtons)) {
+            if (btn && this.keyDefinitions[keyId]) {
+                const label = this.keyDefinitions[keyId].label || keyId.toUpperCase();
+                btn.textContent = label;
+            }
+        }
+    }
+
+    /**
+     * Apply a key mapping preset ('classic', 'wasd', or 'custom')
+     */
+    setPreset(presetName) {
+        this.settings.mappingPreset = presetName;
+        if (presetName === 'custom' && !this.settings.customMappings) {
+            this.settings.customMappings = JSON.parse(JSON.stringify(this.keyDefinitions));
+        }
+        this.keyDefinitions = this.getEffectiveMappings();
+        this.updateButtonLabels();
+        this.saveSettings();
+    }
+
+    /**
+     * Update a single action button mapping
+     */
+    setCustomKeyMapping(actionId, keyOptionCode) {
+        const option = RuffleTouch.AVAILABLE_KEYS[keyOptionCode];
+        if (!option) return;
+
+        if (!this.settings.customMappings) {
+            this.settings.customMappings = JSON.parse(JSON.stringify(this.keyDefinitions));
+        }
+
+        this.settings.customMappings[actionId] = {
+            key: option.key,
+            code: option.code,
+            keyCode: option.keyCode,
+            label: option.label.replace(/^[▲▼◀▶]\s*/, '')
+        };
+
+        this.settings.mappingPreset = 'custom';
+        this.keyDefinitions = this.getEffectiveMappings();
+        this.updateButtonLabels();
+        this.saveSettings();
+    }
+
+    /**
+     * Get active key mappings based on preset or custom settings
+     */
+    getEffectiveMappings() {
+        const preset = this.settings.mappingPreset || 'classic';
+        if (preset === 'custom' && this.settings.customMappings) {
+            return JSON.parse(JSON.stringify(this.settings.customMappings));
+        }
+        if (this.presets[preset]) {
+            return JSON.parse(JSON.stringify(this.presets[preset]));
+        }
+        return JSON.parse(JSON.stringify(this.presets['classic']));
+    }
+
     applySettings() {
         if (!this.overlayElement) return;
 
@@ -197,6 +315,78 @@ class RuffleTouch {
         fileInput.click();
     }
 
+
+    /**
+     * Set input mode ('gamepad' or 'mouse')
+     */
+    setMode(mode, showToast = true) {
+        if (mode !== 'gamepad' && mode !== 'mouse') return;
+
+        this.inputMode = mode;
+        this.settings.inputMode = mode;
+        this.saveSettings();
+
+        if (this.modeBtn) {
+            if (this.inputMode === 'mouse') {
+                this.modeBtn.innerHTML = '🖱️';
+                this.modeBtn.setAttribute('aria-label', 'Switch to Gamepad Mode');
+                this.modeBtn.title = 'Mouse Mode active - Click to switch to Gamepad Mode';
+            } else {
+                this.modeBtn.innerHTML = '🎮';
+                this.modeBtn.setAttribute('aria-label', 'Switch to Mouse Mode');
+                this.modeBtn.title = 'Gamepad Mode active - Click to switch to Mouse Mode';
+            }
+        }
+
+        // In Mouse Mode, hide controls overlay so touch directly interacts with canvas
+        if (this.overlayElement) {
+            if (this.inputMode === 'mouse') {
+                this.overlayElement.classList.add('ruffle-touch-hidden');
+            } else if (this.visible) {
+                this.overlayElement.classList.remove('ruffle-touch-hidden');
+            }
+        }
+
+        if (showToast) {
+            const toastText = this.inputMode === 'mouse'
+                ? '🖱️ Mouse Mode (Touch directly controls canvas)'
+                : '🎮 Gamepad Mode (Virtual controls enabled)';
+            this.showToast(toastText);
+        }
+    }
+
+    /**
+     * Toggle between Gamepad Mode and Mouse Mode
+     */
+    toggleMode() {
+        const newMode = this.inputMode === 'gamepad' ? 'mouse' : 'gamepad';
+        this.setMode(newMode, true);
+    }
+
+    /**
+     * Show floating toast notification pill
+     */
+    showToast(message) {
+        if (!this.toastElement) {
+            this.toastElement = document.createElement('div');
+            this.toastElement.className = 'ruffle-touch-toast';
+            this.container.appendChild(this.toastElement);
+        }
+
+        this.toastElement.textContent = message;
+        this.toastElement.classList.add('show');
+
+        if (this.toastTimeout) {
+            clearTimeout(this.toastTimeout);
+        }
+
+        this.toastTimeout = setTimeout(() => {
+            if (this.toastElement) {
+                this.toastElement.classList.remove('show');
+            }
+        }, 2200);
+    }
+
     /**
      * Build the UI overlay DOM structure
      */
@@ -234,12 +424,23 @@ class RuffleTouch {
             this.toggleSettingsDrawer();
         });
 
-        // Gamepad Toggle Button (🎮)
+        // Mode Switcher Button (🎮 / 🖱️)
+        this.modeBtn = document.createElement('button');
+        this.modeBtn.className = 'ruffle-touch-toolbar-btn ruffle-touch-mode';
+        this.modeBtn.type = 'button';
+        this.modeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.toggleMode();
+            this.focusPlayer();
+        });
+
+        // Visibility Toggle Button (👁️ / 🙈)
         this.toggleBtn = document.createElement('button');
         this.toggleBtn.className = 'ruffle-touch-toolbar-btn ruffle-touch-toggle';
-        this.toggleBtn.setAttribute('aria-label', 'Toggle Gamepad Controls');
+        this.toggleBtn.setAttribute('aria-label', 'Toggle Gamepad Overlay Visibility');
         this.toggleBtn.type = 'button';
-        this.toggleBtn.innerHTML = '🎮';
+        this.toggleBtn.innerHTML = '👁️';
         this.toggleBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -248,6 +449,7 @@ class RuffleTouch {
         });
 
         this.toolbarElement.appendChild(this.openSwfBtn);
+        this.toolbarElement.appendChild(this.modeBtn);
         this.toolbarElement.appendChild(this.settingsBtn);
         this.toolbarElement.appendChild(this.toggleBtn);
 
@@ -296,7 +498,8 @@ class RuffleTouch {
         this.container.appendChild(this.drawerBackdrop);
         this.container.appendChild(this.drawerElement);
 
-        // Apply settings styling
+        // Apply initial input mode & settings styling
+        this.setMode(this.inputMode, false);
         this.applySettings();
     }
 
@@ -762,8 +965,125 @@ class RuffleTouch {
 
         saveSection.appendChild(saveButtonsGroup);
 
+
+        // Section: Key Mapping
+        const mappingSection = document.createElement('div');
+        mappingSection.className = 'ruffle-touch-settings-section';
+
+        const mappingSectionTitle = document.createElement('h4');
+        mappingSectionTitle.textContent = 'Key Mapping & Presets';
+        mappingSection.appendChild(mappingSectionTitle);
+
+        // Preset Dropdown Group
+        const presetGroup = document.createElement('div');
+        presetGroup.className = 'ruffle-touch-setting-group';
+
+        const presetLabelRow = document.createElement('div');
+        presetLabelRow.className = 'setting-label-row';
+        const presetLabel = document.createElement('label');
+        presetLabel.textContent = 'Preset Profile';
+        presetLabelRow.appendChild(presetLabel);
+
+        const presetSelect = document.createElement('select');
+        presetSelect.className = 'ruffle-touch-select';
+
+        const presetsOptions = [
+            { id: 'classic', name: 'Classic (Arrows + Z/X/Space)' },
+            { id: 'wasd', name: 'WASD + Space' },
+            { id: 'custom', name: 'Custom Mapping' }
+        ];
+
+        presetsOptions.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            opt.selected = (this.settings.mappingPreset || 'classic') === p.id;
+            presetSelect.appendChild(opt);
+        });
+
+        presetGroup.appendChild(presetLabelRow);
+        presetGroup.appendChild(presetSelect);
+        mappingSection.appendChild(presetGroup);
+
+        // Individual Action Button Remapping Controls
+        const mappingGrid = document.createElement('div');
+        mappingGrid.className = 'ruffle-touch-mapping-grid';
+
+        const actionsToMap = [
+            { id: 'up', name: 'D-Pad Up' },
+            { id: 'down', name: 'D-Pad Down' },
+            { id: 'left', name: 'D-Pad Left' },
+            { id: 'right', name: 'D-Pad Right' },
+            { id: 'z', name: 'Button Z (Primary)' },
+            { id: 'x', name: 'Button X (Secondary)' },
+            { id: 'space', name: 'Button Space' },
+            { id: 'enter', name: 'Button Enter' }
+        ];
+
+        const selectElements = {};
+
+        actionsToMap.forEach(act => {
+            const row = document.createElement('div');
+            row.className = 'mapping-row';
+
+            const label = document.createElement('span');
+            label.className = 'mapping-label';
+            label.textContent = act.name;
+
+            const select = document.createElement('select');
+            select.className = 'ruffle-touch-select select-sm';
+
+            const currentDef = this.keyDefinitions[act.id] || {};
+
+            Object.entries(RuffleTouch.AVAILABLE_KEYS).forEach(([code, item]) => {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = item.label;
+                if (currentDef.code === item.code || currentDef.key === item.key) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+
+            select.addEventListener('change', (e) => {
+                this.setCustomKeyMapping(act.id, e.target.value);
+                presetSelect.value = 'custom';
+            });
+
+            selectElements[act.id] = select;
+
+            row.appendChild(label);
+            row.appendChild(select);
+            mappingGrid.appendChild(row);
+        });
+
+        mappingSection.appendChild(mappingGrid);
+
+        const updateSelectsToMatchCurrent = () => {
+            actionsToMap.forEach(act => {
+                const sel = selectElements[act.id];
+                if (!sel) return;
+                const currentDef = this.keyDefinitions[act.id] || {};
+                for (let i = 0; i < sel.options.length; i++) {
+                    const code = sel.options[i].value;
+                    const item = RuffleTouch.AVAILABLE_KEYS[code];
+                    if (item && (item.code === currentDef.code || item.key === currentDef.key)) {
+                        sel.selectedIndex = i;
+                        break;
+                    }
+                }
+            });
+        };
+
+        presetSelect.addEventListener('change', (e) => {
+            this.setPreset(e.target.value);
+            updateSelectsToMatchCurrent();
+        });
+
         content.appendChild(uiSection);
+        content.appendChild(mappingSection);
         content.appendChild(saveSection);
+
 
         this.drawerElement.appendChild(header);
         this.drawerElement.appendChild(content);

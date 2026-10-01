@@ -59,12 +59,9 @@
 /* Gamepad Overlay Container - Pushed to safe margins / letterbox areas */
 .ruffle-touch-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -498,4 +495,85 @@
     width: 100vw;
     max-width: 100vw;
   }
+}
+
+/* Floating Mode Switcher Toast Indicator */
+.ruffle-touch-toast {
+  position: fixed;
+  top: max(72px, calc(env(safe-area-inset-top) + 60px));
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(18, 22, 28, 0.92);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  color: #f0f4f8;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10005;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.ruffle-touch-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Select Dropdowns in Settings Drawer */
+.ruffle-touch-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ruffle-touch-select:focus,
+.ruffle-touch-select:hover {
+  border-color: #58a6ff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ruffle-touch-select option {
+  background: #161b22;
+  color: #f0f4f8;
+}
+
+.ruffle-touch-select.select-sm {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  width: auto;
+  max-width: 150px;
+}
+
+/* Key Mapping Grid in Drawer */
+.ruffle-touch-mapping-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+}
+
+.mapping-label {
+  font-size: 0.85rem;
+  color: #c9d1d9;
 }
