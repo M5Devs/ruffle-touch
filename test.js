@@ -68,6 +68,13 @@ async function runTests() {
         if (url.startsWith('https://direct-fail.com')) {
             throw new TypeError('Failed to fetch (CORS error)');
         }
+        if (url.startsWith('https://m5-cors.claus-valca67.workers.dev')) {
+            return {
+                ok: false,
+                status: 502,
+                statusText: 'Bad Gateway'
+            };
+        }
         if (url.startsWith('https://api.allorigins.win')) {
             return {
                 ok: false,
@@ -95,10 +102,11 @@ async function runTests() {
     const targetUrl = 'https://direct-fail.com/game.swf';
     const resultBuf = await RuffleTouch.fetchWithCorsProxy(targetUrl, 'arraybuffer');
 
-    assert.strictEqual(calledUrls.length, 3, 'Should attempt 3 proxy URLs');
+    assert.strictEqual(calledUrls.length, 4, 'Should attempt 4 proxy URLs');
     assert.strictEqual(calledUrls[0], 'https://direct-fail.com/game.swf', 'Step 1: Direct fetch');
-    assert.strictEqual(calledUrls[1], `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, 'Step 2: allorigins');
-    assert.strictEqual(calledUrls[2], `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`, 'Step 3: codetabs');
+    assert.strictEqual(calledUrls[1], `https://m5-cors.claus-valca67.workers.dev/?url=${encodeURIComponent(targetUrl)}`, 'Step 2: Cloudflare CORS Worker proxy');
+    assert.strictEqual(calledUrls[2], `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, 'Step 3: allorigins');
+    assert.strictEqual(calledUrls[3], `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`, 'Step 4: codetabs');
     assert.strictEqual(RuffleTouch.isValidSwf(resultBuf), true, 'Result should be valid SWF');
     assert.strictEqual(calledUrls.some(u => u.includes('corsproxy.io')), false, 'corsproxy.io must NOT be called');
 
