@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ruffle Touch Demo</title>
+    <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RuffleTouch">
   <link rel="stylesheet" href="src/ruffle-touch.css">
   <style>
     * {
@@ -303,6 +307,21 @@
       const btnFetchSwf = document.getElementById('btn-fetch-swf');
       const launcherStatus = document.getElementById('launcher-status');
       const statusText = document.getElementById('status-text');
+
+      // Register Service Worker for Offline PWA Support
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then((registration) => {
+            console.log('[App] ServiceWorker registered with scope:', registration.scope);
+          }).catch((error) => {
+            console.error('[App] ServiceWorker registration failed:', error);
+          });
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[App] Service worker controller changed. App ready for offline play.');
+        });
+      }
 
       // Instantiate RuffleTouch controller overlay attached to #app container (hidden by default)
       const ruffleTouch = new RuffleTouch({
