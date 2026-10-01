@@ -199,6 +199,157 @@ async function runTests() {
 
     console.log('✅ Test 5 Passed!');
 
+    console.log('--- Test 6: Virtual Gaming Keyboard & Mode Switcher ---');
+    // Setup jsdom-like mock environment for Keyboard tests
+    const mockEvents = [];
+    global.window = {
+        dispatchEvent: (evt) => {
+            mockEvents.push(evt);
+        }
+    };
+    global.KeyboardEvent = class KeyboardEvent {
+        constructor(type, options) {
+            this.type = type;
+            Object.assign(this, options);
+        }
+    };
+    global.document = {
+        createElement: (tag) => {
+            const el = {
+                tagName: tag.toUpperCase(),
+                classList: {
+                    classes: new Set(),
+                    add: function(c) { this.classes.add(c); },
+                    remove: function(c) { this.classes.delete(c); },
+                    contains: function(c) { return this.classes.has(c); },
+                    toggle: function(c, val) { if (val) this.add(c); else this.remove(c); }
+                },
+                style: {},
+                children: [],
+                listeners: {},
+                appendChild: function(child) { this.children.push(child); child.parentNode = this; return child; },
+                removeChild: function(child) {
+                    const idx = this.children.indexOf(child);
+                    if (idx !== -1) this.children.splice(idx, 1);
+                },
+                setAttribute: function(k, v) { this[k] = v; },
+                dataset: {},
+                getAttribute: function(k) { return this[k] || null; },
+                querySelector: function(sel) {
+                    if (sel.startsWith('.')) {
+                        const className = sel.slice(1);
+                        const find = (node) => {
+                            if (node.classList && node.classList.contains(className)) return node;
+                            if (node.children) {
+                                for (const c of node.children) {
+                                    const res = find(c);
+                                    if (res) return res;
+                                }
+                            }
+                            return null;
+                        };
+                        return find(this);
+                    }
+                    return null;
+                },
+                querySelectorAll: function(sel) {
+                    const results = [];
+                    if (sel.startsWith('.')) {
+                        const className = sel.slice(1);
+                        const find = (node) => {
+                            if (node.className && node.className.split(' ').includes(className)) results.push(node);
+                            if (node.children) {
+                                for (const c of node.children) {
+                                    find(c);
+                                }
+                            }
+                        };
+                        find(this);
+                    }
+                    return results;
+                },
+                addEventListener: function(event, fn) {
+                    if (!this.listeners[event]) this.listeners[event] = [];
+                    this.listeners[event].push(fn);
+                },
+                dispatchEvent: function(evt) {
+                    if (this.listeners[evt.type]) {
+                        this.listeners[evt.type].forEach(fn => fn(evt));
+                    }
+                }
+            };
+            return el;
+        },
+        body: {
+            children: [],
+            appendChild: function(child) { this.children.push(child); },
+            addEventListener: function() {}
+        }
+    };
+    global.localStorage = {
+        getItem: () => null,
+        setItem: () => {}
+    };
+
+    const inst = new RuffleTouch({ visible: true });
+    assert.strictEqual(inst.inputMode, 'gamepad');
+    assert.strictEqual(inst.overlayElement.classList.contains('ruffle-touch-hidden'), false);
+    assert.strictEqual(inst.keyboardElement.classList.contains('ruffle-touch-hidden'), true);
+
+    // Test mode switching cycle: gamepad -> mouse -> keyboard -> gamepad
+    inst.toggleMode();
+    assert.strictEqual(inst.inputMode, 'mouse');
+    assert.strictEqual(inst.overlayElement.classList.contains('ruffle-touch-hidden'), true);
+    assert.strictEqual(inst.keyboardElement.classList.contains('ruffle-touch-hidden'), true);
+
+    inst.toggleMode();
+    assert.strictEqual(inst.inputMode, 'keyboard');
+    assert.strictEqual(inst.overlayElement.classList.contains('ruffle-touch-hidden'), true);
+    assert.strictEqual(inst.keyboardElement.classList.contains('ruffle-touch-hidden'), false);
+
+    inst.toggleMode();
+    assert.strictEqual(inst.inputMode, 'gamepad');
+
+    // Test virtual keyboard layout and key event triggering
+    inst.setMode('keyboard', false);
+    const keys = inst.keyboardElement.querySelectorAll('.keyboard-key');
+    assert.strictEqual(keys.length, 44, 'Virtual keyboard should contain 44 keys across 4 rows');
+
+    // Find Space key button
+    const spaceBtn = keys.find(k => k.textContent === 'Space');
+    assert.ok(spaceBtn, 'Space key button should exist');
+
+    mockEvents.length = 0;
+    const preventDefaultCalled = [];
+    const dummyEvent = {
+        type: 'pointerdown',
+        preventDefault: () => preventDefaultCalled.push('preventDefault'),
+        stopPropagation: () => {}
+    };
+    spaceBtn.dispatchEvent(dummyEvent);
+
+    assert.strictEqual(preventDefaultCalled.length, 1, 'pointerdown preventDefault should be called to prevent focus loss');
+    assert.strictEqual(mockEvents.length, 1, 'One keydown event should be dispatched');
+    assert.strictEqual(mockEvents[0].type, 'keydown');
+    assert.strictEqual(mockEvents[0].key, ' ');
+    assert.strictEqual(mockEvents[0].code, 'Space');
+    assert.strictEqual(mockEvents[0].keyCode, 32);
+
+    // Release key
+    const releaseEvent = {
+        type: 'pointerup',
+        preventDefault: () => {},
+        stopPropagation: () => {}
+    };
+    spaceBtn.dispatchEvent(releaseEvent);
+    assert.strictEqual(mockEvents.length, 2, 'One keyup event should be dispatched');
+    assert.strictEqual(mockEvents[1].type, 'keyup');
+    assert.strictEqual(mockEvents[1].key, ' ');
+    assert.strictEqual(mockEvents[1].code, 'Space');
+    assert.strictEqual(mockEvents[1].keyCode, 32);
+
+    console.log('✅ Test 6 Passed!');
+
 
     console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY!');
 }
