@@ -67,6 +67,12 @@ class RuffleTouch {
         this.toastElement = null;
         this.toastTimeout = null;
 
+        // Currently loaded SWF binary data for download/archival
+        this.loadedSwfData = null; // ArrayBuffer or Blob
+        this.loadedSwfFilename = "game.swf";
+        this.downloadBtn = null;
+        this.drawerDownloadBtn = null;
+
         // Preset Key Mappings Definition Table
         this.presets = {
             'classic': {
@@ -401,6 +407,20 @@ class RuffleTouch {
         this.toolbarElement.className = 'ruffle-touch-toolbar';
 
         // Open SWF Folder Button (📁)
+        // Download SWF Button (📥)
+        this.downloadBtn = document.createElement('button');
+        this.downloadBtn.className = 'ruffle-touch-toolbar-btn ruffle-touch-download-swf';
+        this.downloadBtn.setAttribute('aria-label', 'Download / Archive SWF File');
+        this.downloadBtn.title = 'Download SWF file to device';
+        this.downloadBtn.type = 'button';
+        this.downloadBtn.innerHTML = '📥';
+        this.downloadBtn.style.display = this.loadedSwfData ? 'flex' : 'none';
+        this.downloadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.downloadSwf();
+        });
+
         this.openSwfBtn = document.createElement('button');
         this.openSwfBtn.className = 'ruffle-touch-toolbar-btn ruffle-touch-open-swf';
         this.openSwfBtn.setAttribute('aria-label', 'Open / Change SWF File');
@@ -448,6 +468,7 @@ class RuffleTouch {
             this.focusPlayer();
         });
 
+        this.toolbarElement.appendChild(this.downloadBtn);
         this.toolbarElement.appendChild(this.openSwfBtn);
         this.toolbarElement.appendChild(this.modeBtn);
         this.toolbarElement.appendChild(this.settingsBtn);
@@ -881,6 +902,17 @@ class RuffleTouch {
         const quickActionsGroup = document.createElement('div');
         quickActionsGroup.className = 'ruffle-touch-setting-group';
 
+        const downloadSwfDrawerBtn = document.createElement('button');
+        downloadSwfDrawerBtn.type = 'button';
+        downloadSwfDrawerBtn.className = 'ruffle-touch-btn-action ruffle-touch-download-swf';
+        downloadSwfDrawerBtn.innerHTML = '📥 Download / Archive SWF';
+        downloadSwfDrawerBtn.style.display = this.loadedSwfData ? 'flex' : 'none';
+        downloadSwfDrawerBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.downloadSwf();
+        });
+        this.drawerDownloadBtn = downloadSwfDrawerBtn;
+
         const openSwfDrawerBtn = document.createElement('button');
         openSwfDrawerBtn.type = 'button';
         openSwfDrawerBtn.className = 'ruffle-touch-btn-action';
@@ -900,6 +932,7 @@ class RuffleTouch {
             this.toggleFullscreen();
         });
 
+        quickActionsGroup.appendChild(downloadSwfDrawerBtn);
         quickActionsGroup.appendChild(openSwfDrawerBtn);
         quickActionsGroup.appendChild(fullscreenBtn);
         uiSection.appendChild(quickActionsGroup);
@@ -1482,6 +1515,210 @@ class RuffleTouch {
         }
         if (this.drawerElement && this.drawerElement.parentNode) {
             this.drawerElement.parentNode.removeChild(this.drawerElement);
+        }
+    }
+
+    /**
+     * Store loaded SWF binary data and enable download buttons
+     * @param {ArrayBuffer|Blob} data
+     * @param {string} [filename="game.swf"]
+     */
+    setLoadedSwf(data, filename = "game.swf") {
+        this.loadedSwfData = data;
+        this.loadedSwfFilename = filename || "game.swf";
+
+        if (this.downloadBtn) {
+            this.downloadBtn.style.display = "flex";
+        }
+        if (this.drawerDownloadBtn) {
+            this.drawerDownloadBtn.style.display = "flex";
+        }
+    }
+
+    /**
+     * Trigger browser download of current SWF file
+     */
+    downloadSwf() {
+        if (!this.loadedSwfData) {
+            this.showToast("⚠️ No SWF loaded to download");
+            return;
+        }
+
+        try {
+            const blob = this.loadedSwfData instanceof Blob
+                ? this.loadedSwfData
+                : new Blob([this.loadedSwfData], { type: "application/x-shockwave-flash" });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = this.loadedSwfFilename.endsWith(".swf") ? this.loadedSwfFilename : `${this.loadedSwfFilename}.swf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showToast(`📥 Downloading ${a.download}...`);
+        } catch (err) {
+            console.error("RuffleTouch: Download SWF failed", err);
+            this.showToast("❌ Download failed");
+        }
+    }
+
+    static extractSwfUrlFromHtml(html, baseUrl) {
+        if (!html) return null;
+
+        let foundUrl = null;
+
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            // 1. Inspect <embed src="...">
+            const embeds = doc.querySelectorAll("embed[src]");
+            for (const embed of embeds) {
+                const src = embed.getAttribute("src");
+                if (src && src.toLowerCase().includes(".swf")) {
+                    foundUrl = src;
+                    break;
+                }
+            }
+
+            // 2. Inspect <object data="...">
+            if (!foundUrl) {
+                const objects = doc.querySelectorAll("object[data]");
+                for (const obj of objects) {
+                    const data = obj.getAttribute("data");
+                    if (data && data.toLowerCase().includes(".swf")) {
+                        foundUrl = data;
+                        break;
+                    }
+                }
+            }
+
+            // 3. Inspect <param name="movie" value="..."> or <param name="src" value="...">
+            if (!foundUrl) {
+                const params = doc.querySelectorAll("param");
+                for (const param of params) {
+                    const name = (param.getAttribute("name") || "").toLowerCase();
+                    const value = param.getAttribute("value");
+                    if ((name === "movie" || name === "src" || name === "filename") && value && value.toLowerCase().includes(".swf")) {
+                        foundUrl = value;
+                        break;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("RuffleTouch: DOM parsing error:", err);
+        }
+
+        // 4. Regex pattern search for https?://[^"'\s]+\.swf or relative .+\.swf
+        if (!foundUrl) {
+            const matches = html.match(/https?:\/\/[^"'\s<>]+\.swf(?:\?[^"'\s<>]*)?/gi) ||
+                            html.match(/[^"'\s<>]+\.swf(?:\?[^"'\s<>]*)?/gi);
+            if (matches && matches.length > 0) {
+                foundUrl = matches[0];
+            }
+        }
+
+        if (!foundUrl) return null;
+
+        try {
+            return new URL(foundUrl, baseUrl).href;
+        } catch (e) {
+            return foundUrl;
+        }
+    }
+
+    /**
+     * Helper to fetch a resource with fallback CORS proxies
+     * @param {string} targetUrl
+     * @param {string} [responseType="arraybuffer"] "arraybuffer" or "text"
+     */
+    static async fetchWithCorsProxy(targetUrl, responseType = "arraybuffer") {
+        const proxies = [
+            (u) => u,
+            (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+            (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`
+        ];
+
+        let lastError = null;
+
+        for (const makeUrl of proxies) {
+            const proxyUrl = makeUrl(targetUrl);
+            try {
+                const res = await fetch(proxyUrl);
+                if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+                if (responseType === "text") {
+                    const text = await res.text();
+                    if (text) return text;
+                } else {
+                    const buf = await res.arrayBuffer();
+                    if (buf && buf.byteLength > 0) return buf;
+                }
+            } catch (err) {
+                lastError = err;
+            }
+        }
+
+        throw lastError || new Error(`Failed to fetch ${targetUrl} via all proxy attempts.`);
+    }
+
+    /**
+     * Fetch direct .swf URL or extract .swf from webpage URL
+     * @param {string} inputUrl
+     * @param {Function} [statusCallback] (message, isError)
+     */
+    static async fetchAndExtractSwf(inputUrl, statusCallback = () => {}) {
+        let url = inputUrl.trim();
+        if (!url) {
+            throw new Error("URL cannot be empty.");
+        }
+
+        if (!/^https?:\/\//i.test(url)) {
+            url = "https://" + url;
+        }
+
+        const isDirectSwf = url.split("?")[0].toLowerCase().endsWith(".swf");
+
+        if (isDirectSwf) {
+            statusCallback("Downloading SWF file...", false);
+            const arrayBuffer = await RuffleTouch.fetchWithCorsProxy(url, "arraybuffer");
+
+            // Extract filename from URL
+            const urlPath = url.split("?")[0];
+            const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
+
+            return {
+                data: arrayBuffer,
+                swfUrl: url,
+                filename: fileName
+            };
+        } else {
+            statusCallback("Extracting SWF from webpage...", false);
+            let htmlText = "";
+            try {
+                htmlText = await RuffleTouch.fetchWithCorsProxy(url, "text");
+            } catch (err) {
+                throw new Error("Unable to fetch webpage content. Check the URL and try again.");
+            }
+
+            const extractedSwfUrl = RuffleTouch.extractSwfUrlFromHtml(htmlText, url);
+            if (!extractedSwfUrl) {
+                throw new Error("No SWF file found on the provided webpage.");
+            }
+
+            statusCallback(`SWF found: ${extractedSwfUrl.split("/").pop()}. Downloading...`, false);
+            const arrayBuffer = await RuffleTouch.fetchWithCorsProxy(extractedSwfUrl, "arraybuffer");
+
+            const urlPath = extractedSwfUrl.split("?")[0];
+            const fileName = urlPath.substring(urlPath.lastIndexOf("/") + 1) || "game.swf";
+
+            return {
+                data: arrayBuffer,
+                swfUrl: extractedSwfUrl,
+                filename: fileName
+            };
         }
     }
 }

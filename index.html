@@ -141,6 +141,103 @@
       transform: scale(0.96);
     }
 
+    .launcher-actions {
+      margin-bottom: 20px;
+    }
+
+    .launcher-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 20px 0;
+      color: #8b949e;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .launcher-divider::before,
+    .launcher-divider::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .launcher-divider span {
+      padding: 0 12px;
+    }
+
+    .url-input-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    @media (min-width: 480px) {
+      .url-input-container {
+        flex-direction: row;
+      }
+    }
+
+    .url-input {
+      flex: 1;
+      background: rgba(13, 17, 23, 0.8);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #f0f4f8;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .url-input:focus {
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    }
+
+    .btn-fetch {
+      background-color: #1f6beb;
+      box-shadow: 0 4px 12px rgba(31, 107, 235, 0.4);
+      white-space: nowrap;
+      justify-content: center;
+    }
+
+    .btn-fetch:hover {
+      background-color: #388bfd;
+    }
+
+    .launcher-status {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: #58a6ff;
+    }
+
+    .launcher-status.error {
+      color: #f85149;
+    }
+
+    .launcher-status.hidden {
+      display: none !important;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(88, 166, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #58a6ff;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     ruffle-player {
       width: 100%;
       height: 100%;
@@ -164,9 +261,27 @@
         <div class="launcher-icon">🎮</div>
         <h2>Flash Game Launcher</h2>
         <p>Drag and drop a Flash (.swf) game file here, or click below to select one from your device.</p>
-        <button type="button" id="btn-select-swf" class="btn-launcher">
-          📁 Choose SWF File
-        </button>
+        <div class="launcher-actions">
+          <button type="button" id="btn-select-swf" class="btn-launcher">
+            📁 Choose SWF File
+          </button>
+        </div>
+
+        <div class="launcher-divider">
+          <span>OR</span>
+        </div>
+
+        <div class="url-input-container">
+          <input type="url" id="swf-url-input" class="url-input" placeholder="Enter webpage or direct .swf URL..." autocomplete="off" spellcheck="false">
+          <button type="button" id="btn-fetch-swf" class="btn-launcher btn-fetch">
+            🌐 Fetch & Play
+          </button>
+        </div>
+
+        <div id="launcher-status" class="launcher-status hidden">
+          <div class="spinner"></div>
+          <span id="status-text">Loading...</span>
+        </div>
       </div>
     </div>
   </div>
@@ -184,6 +299,10 @@
       const launcherCard = document.getElementById('launcher-card');
       const globalFileInput = document.getElementById('global-swf-input');
       const btnSelectSwf = document.getElementById('btn-select-swf');
+      const swfUrlInput = document.getElementById('swf-url-input');
+      const btnFetchSwf = document.getElementById('btn-fetch-swf');
+      const launcherStatus = document.getElementById('launcher-status');
+      const statusText = document.getElementById('status-text');
 
       // Instantiate RuffleTouch controller overlay attached to #app container (hidden by default)
       const ruffleTouch = new RuffleTouch({
@@ -198,6 +317,17 @@
         globalFileInput.click();
       }
 
+      function showStatus(msg, isError = false) {
+        if (!launcherStatus) return;
+        launcherStatus.classList.remove('hidden', 'error');
+        if (isError) launcherStatus.classList.add('error');
+        if (statusText) statusText.textContent = msg;
+      }
+
+      function hideStatus() {
+        if (launcherStatus) launcherStatus.classList.add('hidden');
+      }
+
       btnSelectSwf.addEventListener('click', triggerFilePicker);
 
       globalFileInput.addEventListener('change', (e) => {
@@ -207,6 +337,44 @@
           globalFileInput.value = '';
         }
       });
+
+      // Handle URL Fetch & Play
+      async function handleUrlFetch() {
+        const url = swfUrlInput ? swfUrlInput.value.trim() : '';
+        if (!url) {
+          showStatus('Please enter a webpage or .swf URL.', true);
+          return;
+        }
+
+        btnFetchSwf.disabled = true;
+        showStatus('Extracting SWF...', false);
+
+        try {
+          const result = await RuffleTouch.fetchAndExtractSwf(url, (msg, isErr) => {
+            showStatus(msg, isErr);
+          });
+
+          loadSwfBuffer(result.data, result.filename);
+        } catch (err) {
+          showStatus(err.message || 'Failed to extract SWF file.', true);
+          ruffleTouch.showToast('❌ ' + (err.message || 'Failed to extract SWF file.'));
+        } finally {
+          btnFetchSwf.disabled = false;
+        }
+      }
+
+      if (btnFetchSwf) {
+        btnFetchSwf.addEventListener('click', handleUrlFetch);
+      }
+
+      if (swfUrlInput) {
+        swfUrlInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleUrlFetch();
+          }
+        });
+      }
 
       // Drag and drop support on launcher card & container
       ['dragenter', 'dragover'].forEach(eventName => {
@@ -233,9 +401,7 @@
         }
       });
 
-      function loadSwfFile(file) {
-        if (!file) return;
-
+      function startPlayerWithBuffer(arrayBuffer, filename = 'game.swf') {
         document.body.classList.add('game-running');
 
         // Obtain Ruffle player instance using Ruffle API window.RufflePlayer
@@ -250,6 +416,9 @@
           rufflePlayerInstance.parentNode.removeChild(rufflePlayerInstance);
         }
 
+        // Store binary data in ruffleTouch for archival download
+        ruffleTouch.setLoadedSwf(arrayBuffer, filename);
+
         // Hide launcher card with smooth fade
         launcherCard.classList.add('hidden');
 
@@ -262,13 +431,23 @@
         ruffleTouch.setTarget(rufflePlayerInstance);
         ruffleTouch.show();
 
-        // Load local SWF file array buffer
+        // Load SWF data into player
+        rufflePlayerInstance.load({
+          data: arrayBuffer,
+          allowScriptAccess: true
+        });
+      }
+
+      function loadSwfBuffer(arrayBuffer, filename = 'game.swf') {
+        startPlayerWithBuffer(arrayBuffer, filename);
+      }
+
+      function loadSwfFile(file) {
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = (event) => {
-          rufflePlayerInstance.load({
-            data: event.target.result,
-            allowScriptAccess: true
-          });
+          startPlayerWithBuffer(event.target.result, file.name);
         };
         reader.readAsArrayBuffer(file);
       }
