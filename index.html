@@ -90,6 +90,11 @@
       transform: scale(0.95);
       pointer-events: none;
       visibility: hidden;
+      display: none !important;
+    }
+
+    body.game-running header {
+      display: none !important;
     }
 
     .launcher-icon {
@@ -230,6 +235,8 @@
 
       function loadSwfFile(file) {
         if (!file) return;
+
+        document.body.classList.add('game-running');
 
         // Obtain Ruffle player instance using Ruffle API window.RufflePlayer
         const ruffle = window.RufflePlayer ? window.RufflePlayer.newest() : null;
