@@ -169,6 +169,37 @@ async function runTests() {
 
     console.log('✅ Test 4 Passed!');
 
+    console.log('--- Test 5: PWA & Service Worker validation ---');
+    const fs = require('fs');
+
+    assert.strictEqual(fs.existsSync('./manifest.webmanifest'), true, 'manifest.webmanifest should exist');
+    const manifest = JSON.parse(fs.readFileSync('./manifest.webmanifest', 'utf8'));
+    assert.strictEqual(manifest.name, 'Ruffle Touch - Mobile Flash Player');
+    assert.strictEqual(manifest.short_name, 'RuffleTouch');
+    assert.strictEqual(manifest.start_url, './');
+    assert.strictEqual(manifest.scope, './');
+    assert.strictEqual(manifest.display, 'standalone');
+    assert.strictEqual(manifest.background_color, '#0b0b0e');
+    assert.strictEqual(manifest.theme_color, '#0b0b0e');
+    assert.strictEqual(Array.isArray(manifest.icons), true);
+    assert.strictEqual(manifest.icons.length >= 2, true);
+
+    assert.strictEqual(fs.existsSync('./sw.js'), true, 'sw.js should exist');
+    const swContent = fs.readFileSync('./sw.js', 'utf8');
+    assert.strictEqual(swContent.includes('ruffle-touch-v1'), true);
+    assert.strictEqual(swContent.includes('workers.dev'), true);
+    assert.strictEqual(swContent.includes('url='), true);
+    assert.strictEqual(swContent.includes('self.clients.claim()'), true);
+
+    assert.strictEqual(fs.existsSync('./index.html'), true, 'index.html should exist');
+    const htmlContent = fs.readFileSync('./index.html', 'utf8');
+    assert.strictEqual(htmlContent.includes('<link rel="manifest" href="manifest.webmanifest">'), true);
+    assert.strictEqual(htmlContent.includes('apple-mobile-web-app-capable'), true);
+    assert.strictEqual(htmlContent.includes('sw.js'), true);
+
+    console.log('✅ Test 5 Passed!');
+
+
     console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY!');
 }
 

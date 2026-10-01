@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#0b0b0e"/>
+  <!-- Decorative background elements / Flash letter 'f' or Touch Gamepad icon -->
+  <circle cx="256" cy="256" r="200" fill="#161b22" stroke="#30363d" stroke-width="8"/>
+  <!-- D-Pad symbol -->
+  <path d="M 226 140 H 286 V 226 H 372 V 286 H 286 V 372 H 226 V 286 H 140 V 226 H 226 Z" fill="#ff4757" rx="10"/>
+  <!-- Action button accent -->
+  <circle cx="340" cy="170" r="28" fill="#eccc68"/>
+  <circle cx="380" cy="210" r="28" fill="#70a1ff"/>
+</svg>
