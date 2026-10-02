@@ -55,6 +55,7 @@ class RuffleTouch {
         this.drawerElement = null;
         this.drawerBackdrop = null;
         this.keyboardElement = null;
+        this.keyboardDock = null;
 
         // Active key tracking to eliminate duplicate events
         this.activeKeys = new Set();
@@ -362,12 +363,16 @@ class RuffleTouch {
         }
 
         // In Keyboard Mode, show virtual keyboard dock; otherwise hide it
-        if (this.keyboardElement) {
+        const kb = this.keyboardDock || this.keyboardElement;
+        if (kb) {
             if (this.inputMode === 'keyboard' && this.visible) {
-                this.keyboardElement.classList.remove('ruffle-touch-hidden');
-                this.keyboardElement.style.opacity = this.settings.opacity;
+                kb.classList.remove('ruffle-touch-hidden');
+                kb.style.setProperty('display', 'flex', 'important');
+                kb.style.setProperty('visibility', 'visible', 'important');
+                kb.style.setProperty('opacity', '1', 'important');
             } else {
-                this.keyboardElement.classList.add('ruffle-touch-hidden');
+                kb.classList.add('ruffle-touch-hidden');
+                kb.style.setProperty('display', 'none', 'important');
             }
         }
 
@@ -670,13 +675,14 @@ class RuffleTouch {
         this.initSettingsDrawer();
 
         // Virtual Keyboard Dock
-        this.keyboardElement = this.createVirtualKeyboard();
-        this.keyboardElement.classList.add('ruffle-touch-hidden');
+        this.keyboardDock = this.createVirtualKeyboard();
+        this.keyboardElement = this.keyboardDock;
+        this.keyboardDock.classList.add('ruffle-touch-hidden');
 
         // Mount to container
         this.container.appendChild(this.toolbarElement);
         this.container.appendChild(this.overlayElement);
-        this.container.appendChild(this.keyboardElement);
+        this.container.appendChild(this.keyboardDock);
         this.container.appendChild(this.drawerBackdrop);
         this.container.appendChild(this.drawerElement);
 
@@ -1636,19 +1642,23 @@ class RuffleTouch {
      */
     toggleVisibility() {
         this.visible = !this.visible;
+        const kb = this.keyboardDock || this.keyboardElement;
         if (this.visible) {
             if (this.inputMode !== 'mouse' && this.inputMode !== 'keyboard') {
                 this.overlayElement.classList.remove('ruffle-touch-hidden');
                 this.overlayElement.style.opacity = this.settings.opacity;
             }
-            if (this.inputMode === 'keyboard') {
-                this.keyboardElement.classList.remove('ruffle-touch-hidden');
-                this.keyboardElement.style.opacity = this.settings.opacity;
+            if (this.inputMode === 'keyboard' && kb) {
+                kb.classList.remove('ruffle-touch-hidden');
+                kb.style.setProperty('display', 'flex', 'important');
+                kb.style.setProperty('visibility', 'visible', 'important');
+                kb.style.setProperty('opacity', '1', 'important');
             }
         } else {
             this.overlayElement.classList.add('ruffle-touch-hidden');
-            if (this.keyboardElement) {
-                this.keyboardElement.classList.add('ruffle-touch-hidden');
+            if (kb) {
+                kb.classList.add('ruffle-touch-hidden');
+                kb.style.setProperty('display', 'none', 'important');
             }
         }
     }
@@ -1658,13 +1668,16 @@ class RuffleTouch {
      */
     show() {
         this.visible = true;
+        const kb = this.keyboardDock || this.keyboardElement;
         if (this.inputMode !== 'mouse' && this.inputMode !== 'keyboard') {
             this.overlayElement.classList.remove('ruffle-touch-hidden');
             this.overlayElement.style.opacity = this.settings.opacity;
         }
-        if (this.inputMode === 'keyboard' && this.keyboardElement) {
-            this.keyboardElement.classList.remove('ruffle-touch-hidden');
-            this.keyboardElement.style.opacity = this.settings.opacity;
+        if (this.inputMode === 'keyboard' && kb) {
+            kb.classList.remove('ruffle-touch-hidden');
+            kb.style.setProperty('display', 'flex', 'important');
+            kb.style.setProperty('visibility', 'visible', 'important');
+            kb.style.setProperty('opacity', '1', 'important');
         }
     }
 
@@ -1673,9 +1686,11 @@ class RuffleTouch {
      */
     hide() {
         this.visible = false;
+        const kb = this.keyboardDock || this.keyboardElement;
         this.overlayElement.classList.add('ruffle-touch-hidden');
-        if (this.keyboardElement) {
-            this.keyboardElement.classList.add('ruffle-touch-hidden');
+        if (kb) {
+            kb.classList.add('ruffle-touch-hidden');
+            kb.style.setProperty('display', 'none', 'important');
         }
     }
 
@@ -1689,8 +1704,9 @@ class RuffleTouch {
         if (this.overlayElement && this.overlayElement.parentNode) {
             this.overlayElement.parentNode.removeChild(this.overlayElement);
         }
-        if (this.keyboardElement && this.keyboardElement.parentNode) {
-            this.keyboardElement.parentNode.removeChild(this.keyboardElement);
+        const kb = this.keyboardDock || this.keyboardElement;
+        if (kb && kb.parentNode) {
+            kb.parentNode.removeChild(kb);
         }
         if (this.drawerBackdrop && this.drawerBackdrop.parentNode) {
             this.drawerBackdrop.parentNode.removeChild(this.drawerBackdrop);
