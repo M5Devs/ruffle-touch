@@ -224,7 +224,11 @@ async function runTests() {
                     contains: function(c) { return this.classes.has(c); },
                     toggle: function(c, val) { if (val) this.add(c); else this.remove(c); }
                 },
-                style: {},
+                style: {
+                    setProperty: function(prop, val, priority) {
+                        this[prop] = val + (priority ? ' !' + priority : '');
+                    }
+                },
                 children: [],
                 listeners: {},
                 appendChild: function(child) { this.children.push(child); child.parentNode = this; return child; },
@@ -282,7 +286,7 @@ async function runTests() {
         },
         body: {
             children: [],
-            appendChild: function(child) { this.children.push(child); },
+            appendChild: function(child) { this.children.push(child); child.parentNode = this; },
             addEventListener: function() {}
         }
     };
@@ -302,10 +306,18 @@ async function runTests() {
     assert.strictEqual(inst.overlayElement.classList.contains('ruffle-touch-hidden'), true);
     assert.strictEqual(inst.keyboardElement.classList.contains('ruffle-touch-hidden'), true);
 
+    // Verify keyboardDock is appended directly to container and keyboardElement reference
+    assert.ok(inst.keyboardDock, 'keyboardDock property should exist');
+    assert.strictEqual(inst.keyboardElement, inst.keyboardDock, 'keyboardElement should reference keyboardDock');
+    assert.strictEqual(inst.keyboardDock.parentNode, inst.container, 'keyboardDock should be appended directly to container');
+
     inst.toggleMode();
     assert.strictEqual(inst.inputMode, 'keyboard');
     assert.strictEqual(inst.overlayElement.classList.contains('ruffle-touch-hidden'), true);
     assert.strictEqual(inst.keyboardElement.classList.contains('ruffle-touch-hidden'), false);
+    assert.strictEqual(inst.keyboardElement.style.display, 'flex !important');
+    assert.strictEqual(inst.keyboardElement.style.visibility, 'visible !important');
+    assert.strictEqual(inst.keyboardElement.style.opacity, '1 !important');
 
     inst.toggleMode();
     assert.strictEqual(inst.inputMode, 'gamepad');
